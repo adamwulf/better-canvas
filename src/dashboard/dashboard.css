@@ -1,0 +1,172 @@
+/* Better Canvas (Rice) — dashboard course list styling.
+   Tuned to sit inside Canvas's light dashboard and inherit its Lato font. */
+
+#better-canvas-course-list {
+  margin: 0 0 24px 0;
+  font-family: inherit;
+  color: #2d3b45;
+}
+
+#better-canvas-course-list .bc-list-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 4px 0 12px 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e3e8eb;
+}
+
+#better-canvas-course-list .bc-list-head-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+#better-canvas-course-list .bc-list-head-count {
+  font-size: 0.8rem;
+  color: #6b7780;
+}
+
+#better-canvas-course-list .bc-section {
+  margin: 0 0 18px 0;
+}
+
+#better-canvas-course-list .bc-section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 8px 0;
+}
+
+#better-canvas-course-list .bc-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #394b58;
+}
+
+#better-canvas-course-list .bc-section-tag {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #ffffff;
+  background: #394b58;
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+
+#better-canvas-course-list .bc-section-count {
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: #8a959e;
+}
+
+#better-canvas-course-list .bc-rows {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #e3e8eb;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+#better-canvas-course-list .bc-course-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border-left: 4px solid transparent;
+  border-bottom: 1px solid #eef1f3;
+  text-decoration: none;
+  color: inherit;
+  transition: background-color 0.12s ease;
+}
+
+#better-canvas-course-list .bc-course-row:last-child {
+  border-bottom: none;
+}
+
+#better-canvas-course-list .bc-course-row:hover {
+  background: #f5f8fa;
+}
+
+#better-canvas-course-list .bc-course-row:focus-visible {
+  outline: 2px solid #0374b5;
+  outline-offset: -2px;
+}
+
+#better-canvas-course-list .bc-swatch {
+  flex: 0 0 auto;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: #c7cdd1;
+}
+
+#better-canvas-course-list .bc-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+#better-canvas-course-list .bc-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#better-canvas-course-list .bc-sub {
+  font-size: 0.78rem;
+  color: #6b7780;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#better-canvas-course-list .bc-badges {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+#better-canvas-course-list .bc-pill {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+#better-canvas-course-list .bc-pill-unpublished {
+  color: #9a6700;
+  background: #fdf3d8;
+  border: 1px solid #f0d99a;
+}
+
+/* Unpublished courses stay in the same list but read as muted / provisional. */
+#better-canvas-course-list .bc-course-row.bc-unpublished {
+  background: repeating-linear-gradient(
+    45deg,
+    #fbfcfd,
+    #fbfcfd 8px,
+    #f5f7f9 8px,
+    #f5f7f9 16px
+  );
+}
+
+#better-canvas-course-list .bc-course-row.bc-unpublished .bc-title {
+  color: #55606a;
+  font-weight: 600;
+}
+
+#better-canvas-course-list .bc-course-row.bc-unpublished:hover {
+  background: #eef2f5;
+}
