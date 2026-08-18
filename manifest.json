@@ -1,0 +1,41 @@
+{
+  "manifest_version": 3,
+  "name": "Better Canvas (Rice)",
+  "version": "0.1.0",
+  "description": "Personal quality-of-life tweaks for canvas.rice.edu: a custom tab favicon and a semester-grouped course list on the dashboard.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://canvas.rice.edu/*"],
+      "js": ["src/favicon/favicon.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "*://canvas.rice.edu/",
+        "*://canvas.rice.edu/?*",
+        "*://canvas.rice.edu/dashboard",
+        "*://canvas.rice.edu/dashboard?*"
+      ],
+      "js": ["src/lib/terms.js", "src/dashboard/dashboard.js"],
+      "css": ["src/dashboard/dashboard.css"],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "assets/canvas-favicon-16.png",
+        "assets/canvas-favicon-32.png",
+        "assets/canvas-favicon-48.png"
+      ],
+      "matches": ["*://canvas.rice.edu/*"]
+    }
+  ]
+}
