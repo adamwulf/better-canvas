@@ -120,7 +120,15 @@ function isInternalHost(hostname) {
   if (!hostname) {
     return false;
   }
-  var host = hostname.toLowerCase().replace(/^\[|\]$/g, ""); // strip IPv6 brackets
+  // Strip IPv6 brackets, then any trailing FQDN dot(s): "localhost." and
+  // "metadata.google.internal." are the same hosts as their undotted forms and
+  // resolve identically, but the trailing dot would slip past the name checks
+  // below (the "$" anchor never matches with a dot after it). IPv4 literals are
+  // already safe — the WHATWG URL parser canonicalizes "127.0.0.1." to
+  // "127.0.0.1" before we see url.hostname — but stripping here is belt-and-braces.
+  var host = hostname.toLowerCase()
+    .replace(/^\[|\]$/g, "")
+    .replace(/\.+$/, "");
   if (host === "localhost" || host === "ip6-localhost" || host === "ip6-loopback") {
     return true;
   }
@@ -181,6 +189,11 @@ function isInternalIPv6(host) {
   }
   if ((bytes[0] & 0xfe) === 0xfc) {
     return true; // fc00::/7 unique local
+  }
+  if (bytes[0] === 0xff) {
+    return true; // ff00::/8 multicast (mirrors the IPv4 224.0.0.0/4 block). Safe
+                 // to check here: the mapped/compat/nat64 prefixes below all have
+                 // bytes[0] === 0x00, so this never shadows them.
   }
   var isMapped = bytes.slice(0, 10).every(function (x) { return x === 0; }) &&
     bytes[10] === 0xff && bytes[11] === 0xff; // ::ffff:0:0/96
