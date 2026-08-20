@@ -13,10 +13,17 @@
 //
 // Images are inlined as data: URIs by fetching each one through the service
 // worker (the same BC_FETCH_RESOURCE proxy + SSRF guard freeze-dry uses), so
-// the .md is self-contained even for images behind the user's login. The base64
-// blobs are emitted as reference-style definitions at the BOTTOM of the file so
-// the Markdown body stays human-readable; an image that cannot be fetched keeps
-// its absolute remote URL instead.
+// the .md is self-contained even for images behind the user's login. Each one
+// runs through the shared Allume-mirrored optimizer (BCImageOptimizer):
+// jpeg/png re-encodes as webp @0.82 and is kept only when it saves enough;
+// everything else (gif, svg, webp, …) keeps its original bytes. Unlike
+// freeze-dry — where intrinsic image size participates in layout when the
+// archive reloads — Markdown has no such dependency, so this flow also
+// downscales to the image's rendered size on the page (CSS px ×
+// devicePixelRatio, capped at 2, never upscaled) before encoding. The base64
+// blobs are emitted as reference-style definitions at the BOTTOM of the file
+// so the Markdown body stays human-readable; an image that cannot be fetched
+// keeps its absolute remote URL instead.
 //
 // Injected as a single file via chrome.scripting.executeScript({ files: [...] }).
 // The whole file is one self-invoking async IIFE, so the injection's completion
@@ -41,10 +48,17 @@
     if (
       typeof Readability !== "function" ||
       typeof TurndownService !== "function" ||
-      typeof turndownPluginGfm !== "object"
+      typeof turndownPluginGfm !== "object" ||
+      typeof BCImageOptimizer !== "object"
     ) {
-      throw new Error("The vendored Markdown libraries could not be loaded.");
+      throw new Error(
+        "The vendored Markdown libraries or the shared image optimizer could not be loaded."
+      );
     }
+
+    // Rendered sizes must be read off the LIVE document before any cloning —
+    // they drive the Markdown-only downscale in the image optimizer.
+    const renderedSizes = BCImageOptimizer.buildRenderedSizeMap(document);
 
     // --- 1. Try Readability on a clone (Readability mutates its input) ------
     let article = null;
@@ -81,7 +95,7 @@
 
     // --- 3. Inline images as data: URIs, behind placeholder tokens ---------
     const imageStats = { inlined: 0, total: 0 };
-    const imageRefs = await inlineImages(container, imageStats);
+    const imageRefs = await inlineImages(container, imageStats, renderedSizes);
 
     // --- 4. Convert to Markdown ---------------------------------------------
     const turndown = new TurndownService({
@@ -166,10 +180,11 @@
   // --- image inlining -------------------------------------------------------
 
   // Group the container's <img> elements by (absolute) source URL, fetch each
-  // unique URL once, and swap successful ones to placeholder tokens that map to
+  // unique URL once, optimize it (shared Allume pipeline + rendered-size
+  // downscale), and swap successful ones to placeholder tokens that map to
   // data: URIs. Failures, over-size images, and non-image responses keep their
   // remote URL — the export must degrade, never fail, on a bad image.
-  async function inlineImages(container, stats) {
+  async function inlineImages(container, stats, renderedSizes) {
     const groups = new Map(); // absolute URL → { dataUri, imgs: [] }
 
     for (const img of container.querySelectorAll("img")) {
@@ -195,8 +210,7 @@
       stats.total += 1;
       let group = groups.get(url.href);
       if (!group) {
-        // A data: src is already inline — reuse it as-is, no fetch needed.
-        group = { url: url, dataUri: isDataImage ? url.href : null, imgs: [] };
+        group = { url: url, dataUri: null, imgs: [] };
         groups.set(url.href, group);
       }
       group.imgs.push(img);
@@ -204,14 +218,16 @@
 
     await Promise.all(
       Array.from(groups.values()).map(async function (group) {
-        if (group.dataUri) {
-          return;
-        }
         group.dataUri = await raceDeadline(
-          fetchImageAsDataUri(group.url),
+          fetchImageAsDataUri(group.url, renderedSizes.get(group.url.href)),
           INLINE_DEADLINE_MS,
           null
         );
+        // A data: src is already inline — if fetching/optimizing it failed,
+        // fall back to the original URI rather than leaving it in the body.
+        if (!group.dataUri && group.url.protocol === "data:") {
+          group.dataUri = group.url.href;
+        }
       })
     );
 
@@ -237,46 +253,53 @@
   }
 
   // http(s) images go through the service worker (extension host permission +
-  // SSRF guard, same as freeze-dry); blob: URLs belong to this page and are
-  // fetched directly. Returns a data: URI, or null for anything unusable.
-  async function fetchImageAsDataUri(url) {
+  // SSRF guard, same as freeze-dry); blob: and data: URLs belong to this page
+  // and are fetched directly. The blob then runs through the shared optimizer
+  // (webp-or-original, downscaled to renderedSize — the Markdown-only
+  // divergence from Allume). Returns a data: URI, or null for anything
+  // unusable.
+  async function fetchImageAsDataUri(url, renderedSize) {
     try {
-      if (url.protocol === "blob:") {
-        const blob = await (await fetch(url.href)).blob();
-        const mime = normalizeMime(blob.type);
-        if (!mime.startsWith("image/") || blob.size > INLINE_MAX_BYTES) {
+      let blob;
+      if (url.protocol === "blob:" || url.protocol === "data:") {
+        blob = await (await fetch(url.href)).blob();
+      } else {
+        const response = await chrome.runtime.sendMessage({
+          command: "BC_FETCH_RESOURCE",
+          url: url.href,
+          pageHost: pageHost
+        });
+        if (!response || !response.ok || !response.base64) {
           return null;
         }
-        return (
-          "data:" + mime + ";base64," +
-          arrayBufferToBase64(await blob.arrayBuffer())
-        );
+        blob = new Blob([BCImageOptimizer.base64ToBytes(response.base64)], {
+          type: BCImageOptimizer.normalizeMime(response.contentType)
+        });
       }
-      const response = await chrome.runtime.sendMessage({
-        command: "BC_FETCH_RESOURCE",
-        url: url.href,
-        pageHost: pageHost
-      });
-      if (!response || !response.ok || !response.base64) {
+
+      const originalMime = BCImageOptimizer.normalizeMime(blob.type);
+      if (!originalMime.startsWith("image/")) {
         return null;
       }
-      const mime = normalizeMime(response.contentType);
-      if (!mime.startsWith("image/")) {
+      const optimized = await BCImageOptimizer.optimizeImageBlob(
+        blob,
+        renderedSize || null
+      );
+      let chosen = optimized || blob;
+      if (chosen.size > INLINE_MAX_BYTES) {
         return null;
       }
-      if (response.base64.length * 0.75 > INLINE_MAX_BYTES) {
-        return null;
+      // FileReader stamps blob.type into the data: URI verbatim; re-wrap if it
+      // carries parameters that would break a Markdown link destination.
+      if (BCImageOptimizer.normalizeMime(chosen.type) !== chosen.type) {
+        chosen = new Blob([chosen], {
+          type: BCImageOptimizer.normalizeMime(chosen.type) || originalMime
+        });
       }
-      return "data:" + mime + ";base64," + response.base64;
+      return await BCImageOptimizer.blobToDataUri(chosen);
     } catch (error) {
       return null;
     }
-  }
-
-  // A bare lowercase mime type — parameters ("; charset=…") would put a space
-  // inside the data: URI, which breaks the Markdown link destination.
-  function normalizeMime(contentType) {
-    return String(contentType || "").split(";")[0].trim().toLowerCase();
   }
 
   // --- full-page fallback cleanup -------------------------------------------
@@ -359,19 +382,6 @@
         function () { clearTimeout(timer); resolve(fallbackValue); }
       );
     });
-  }
-
-  function arrayBufferToBase64(buffer) {
-    const bytes = new Uint8Array(buffer);
-    const chunkSize = 0x8000; // 32 KB chunks keep String.fromCharCode off the arg limit
-    let binary = "";
-    for (let offset = 0; offset < bytes.length; offset += chunkSize) {
-      binary += String.fromCharCode.apply(
-        null,
-        bytes.subarray(offset, offset + chunkSize)
-      );
-    }
-    return btoa(binary);
   }
 
   // Same sanitization as capture-page.js, with a .md extension.

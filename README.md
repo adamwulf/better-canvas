@@ -41,6 +41,15 @@ computer. CSS, images, and fonts are inlined as `data:` URIs and scripts are
 removed, so the saved file opens offline in any browser, with no network access
 and no JavaScript. It is a static snapshot of the page as you were seeing it.
 
+To keep snapshots small, jpeg/png images referenced by `<img>`/`<picture>` are
+re-encoded as webp (quality 0.82) on the way in, and the webp is kept only when
+it saves at least max(512 bytes, 5%). This mirrors the Allume browser
+extension's pipeline, including its guards (byte-sniffed type, animated-PNG
+bail, dimension limits, fail-soft to the original bytes) and its rule that
+images are **never resized** here — intrinsic raster size participates in
+layout when the archived page reloads. CSS background images are inlined
+untouched, also like Allume.
+
 Browser pages (`chrome://…`) and the Chrome Web Store can't be scripted by
 extensions, so those show a short "can't be saved" message instead. Local
 `file://` pages work only if the extension's **Allow access to file URLs** toggle
@@ -60,10 +69,15 @@ line says which mode ran: `article` or `full page`.
 
 Images are inlined as `data:` URIs (fetched through the same service-worker
 proxy and SSRF guard as freeze-dry), so the `.md` stays self-contained even for
-images behind your login. The base64 blobs sit at the *bottom* of the file as
-reference-style definitions (`![alt][img0]` … `[img0]: data:…`), keeping the
-body readable in a text editor. An image that can't be fetched (or is bigger
-than 8 MB) keeps its absolute remote URL instead. Note that some renderers —
+images behind your login. Each one runs through the same Allume-mirrored
+webp-or-original pipeline as freeze-dry, with one Markdown-only addition: since
+a `.md` file has no layout dependency on intrinsic image size, each image is
+also downscaled to the size it actually occupied on the page (rendered CSS size
+× devicePixelRatio, capped at 2 — never upscaled) before encoding. The base64
+blobs sit at the *bottom* of the file as reference-style definitions
+(`![alt][img0]` … `[img0]: data:…`), keeping the body readable in a text
+editor. An image that can't be fetched (or is bigger than 8 MB after
+optimization) keeps its absolute remote URL instead. Note that some renderers —
 GitHub, notably — refuse `data:` images; Obsidian, VS Code, and Typora render
 them fine.
 
@@ -90,20 +104,33 @@ them fine.
   sub-resource. Cross-origin sub-resources (CDN images, fonts) can't be read by a
   content script because of CORS, so each one is fetched through the service
   worker (`src/background/serviceworker.js`), which carries the extension's host
-  permission. The finished `.html` is downloaded from the page itself via a
+  permission. Fetched jpeg/png images referenced by `<img>`/`<picture>` are run
+  through the shared optimizer (`src/lib/image-optimizer.js`, injected first)
+  before inlining. The finished `.html` is downloaded from the page itself via a
   `Blob` URL — nothing is uploaded anywhere.
 
 - **Markdown export** — on **Export as Markdown** the popup first injects the
   vendored classic scripts (`src/vendor/readability.js`, `turndown.js`,
-  `turndown-plugin-gfm.js`), then `src/content/export-markdown.js`, into the
-  active tab. That script runs Readability on a *clone* of the document
-  (Readability mutates its input; each live image's `currentSrc` is copied onto
-  the clone first so lazy-loaded/srcset images survive). If the extracted
-  article's text is under 500 characters the page counts as "no article" and a
-  cleaned clone of the whole `<body>` is converted instead. Article images are
-  fetched through the same `BC_FETCH_RESOURCE` worker proxy as freeze-dry and
-  swapped to `data:` URIs, and Turndown (+ its GFM plugin) produces the final
-  Markdown, downloaded via a `Blob` URL like freeze-dry.
+  `turndown-plugin-gfm.js`) plus the shared optimizer, then
+  `src/content/export-markdown.js`, into the active tab. That script runs
+  Readability on a *clone* of the document (Readability mutates its input; each
+  live image's `currentSrc` is copied onto the clone first so
+  lazy-loaded/srcset images survive). If the extracted article's text is under
+  500 characters the page counts as "no article" and a cleaned clone of the
+  whole `<body>` is converted instead. Article images are fetched through the
+  same `BC_FETCH_RESOURCE` worker proxy as freeze-dry, optimized
+  (webp-or-original + rendered-size downscale), and swapped to `data:` URIs,
+  and Turndown (+ its GFM plugin) produces the final Markdown, downloaded via a
+  `Blob` URL like freeze-dry.
+
+- **Image optimizer** — `src/lib/image-optimizer.js` (global
+  `BCImageOptimizer`) is a port of the image pipeline in the Allume browser
+  extension (`muse-ios/BrowserExtension/src/content/capture-page.js`): its
+  constants (webp quality 0.82, 32 MB input cap, 16384-px / 16M-pixel dimension
+  guards, ≥ max(512 B, 5%) savings rule, two-slot codec semaphore, 2.5 s
+  per-attempt budget) and its byte-sniffing guards (`inspectPng`,
+  `inspectJpeg`) are copied from there. The rendered-size downscale is this
+  repo's Markdown-only extension of that pipeline.
 
 The Canvas features send only same-origin requests to `canvas.rice.edu` using
 your existing session. Freeze-dry fetches a page's own sub-resources (the same
@@ -135,6 +162,7 @@ assets/                         tab favicon PNGs (16 / 32 / 48)
 src/
   favicon/favicon.js            swaps the tab favicon
   lib/terms.js                  term parsing + semester grouping
+  lib/image-optimizer.js        shared Allume-mirrored image shrinker
   dashboard/dashboard.js        builds the grouped course list
   dashboard/dashboard.css       list styling
   popup/popup.html              toolbar-button menu

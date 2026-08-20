@@ -6,11 +6,13 @@
 // if this popup is closed first; the status shown here is a best-effort
 // confirmation while the popup remains open.
 //
-// "Export as Markdown" needs the vendored Readability/Turndown libraries in the
-// tab before its own script runs. Injections into the same tab land in the same
-// isolated world, where classic-script globals persist across executeScript
-// calls (the dashboard scripts rely on the same behavior), so the action's file
-// groups are injected sequentially and the LAST group's result is the outcome.
+// Both actions need helper classic scripts in the tab before their own script
+// runs: the shared image optimizer (src/lib/image-optimizer.js) for freeze-dry,
+// plus the vendored Readability/Turndown libraries for "Export as Markdown".
+// Injections into the same tab land in the same isolated world, where
+// classic-script globals persist across executeScript calls (the dashboard
+// scripts rely on the same behavior), so the action's file groups are injected
+// sequentially and the LAST group's result is the outcome.
 
 (function () {
   "use strict";
@@ -22,7 +24,10 @@
     {
       buttonId: "bc-freeze-dry",
       workingText: "Freeze-drying this page…",
-      injections: [["src/content/capture-page.js"]]
+      injections: [
+        ["src/lib/image-optimizer.js"],
+        ["src/content/capture-page.js"]
+      ]
     },
     {
       buttonId: "bc-export-md",
@@ -31,7 +36,8 @@
         [
           "src/vendor/readability.js",
           "src/vendor/turndown.js",
-          "src/vendor/turndown-plugin-gfm.js"
+          "src/vendor/turndown-plugin-gfm.js",
+          "src/lib/image-optimizer.js"
         ],
         ["src/content/export-markdown.js"]
       ]
