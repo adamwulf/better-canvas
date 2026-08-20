@@ -30,6 +30,9 @@
 }
 
 #better-canvas-tray-list .bc-section-tag {
+  /* Push the pill to the right side of the header (the count follows it),
+     unlike the dashboard where the pill sits next to the title. */
+  margin-left: auto;
   font-size: 0.62rem;
   font-weight: 700;
   text-transform: uppercase;
