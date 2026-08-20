@@ -4,7 +4,9 @@
 // self-contained static .html via the vendored WebMemex freeze-dry bundle, then
 // hand that file to the user as a download. CSS, images, and fonts are inlined as
 // data: URIs and scripts are stripped, so the saved page opens offline in any
-// browser with no network and no JavaScript.
+// browser with no network and no JavaScript. Eligible <img>/<picture> jpeg/png
+// images are re-encoded as webp at natural size on the way in (shared
+// BCImageOptimizer, mirroring Allume) when that saves enough bytes.
 //
 // Because scripts are stripped, the saved DOM must already carry the page's
 // current visual state. freeze-dry serializes each <style> by its text, so rules
@@ -49,6 +51,21 @@
   // the worker's SSRF guard can tell a capture of a local page (whose own local
   // sub-resources are legitimate) from a public page reaching at internal hosts.
   const pageHost = location.hostname;
+
+  // Shared Allume-mirrored image optimizer (src/lib/image-optimizer.js), which
+  // the popup injects before this script. Eligible <img>/<picture> images are
+  // re-encoded as webp at their NATURAL size before inlining — never resized,
+  // because intrinsic raster size participates in layout when the archive
+  // reloads. CSS background images are inlined untouched, like Allume. If the
+  // lib is missing (this script injected on its own), captures simply skip
+  // the optimization.
+  const imageOptimizer =
+    typeof BCImageOptimizer === "object" && BCImageOptimizer !== null
+      ? BCImageOptimizer
+      : null;
+  const optimizableImageUrls = imageOptimizer
+    ? imageOptimizer.buildEligibleImageUrlSet(document)
+    : null;
 
   // Aborting this stops freeze-dry's crawl if the hard deadline fires; freeze-dry
   // threads the signal into fetchResource so no new sub-resource fetches start.
@@ -189,7 +206,15 @@
     const url = new URL(resourceUrl, location.href);
 
     if (url.protocol !== "http:" && url.protocol !== "https:") {
-      return fetch(url.href, options);
+      if (!imageOptimizer || !optimizableImageUrls.has(url.href)) {
+        return fetch(url.href, options);
+      }
+      const directResponse = await fetch(url.href, options);
+      const directBlob = await directResponse.blob();
+      return {
+        blob: await optimizeIfSmaller(directBlob),
+        url: directResponse.url || url.href
+      };
     }
     if (options.signal?.aborted) {
       throw new DOMException("The capture was aborted.", "AbortError");
@@ -205,12 +230,24 @@
       throw new Error(response?.error || ("Could not fetch " + url.href));
     }
 
+    let blob = new Blob([base64ToBytes(response.base64)], {
+      type: response.contentType
+    });
+    if (imageOptimizer && optimizableImageUrls.has(url.href)) {
+      blob = await optimizeIfSmaller(blob);
+    }
     return {
-      blob: new Blob([base64ToBytes(response.base64)], {
-        type: response.contentType
-      }),
+      blob: blob,
       url: response.url
     };
+  }
+
+  // Natural size only (null renderedSize): a freeze-dried page reflows from
+  // intrinsic image dimensions when it reloads. The optimizer is fail-soft and
+  // returns null whenever the original should be kept.
+  async function optimizeIfSmaller(blob) {
+    const optimized = await imageOptimizer.optimizeImageBlob(blob, null);
+    return optimized || blob;
   }
 
   // --- helpers -------------------------------------------------------------
