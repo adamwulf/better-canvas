@@ -86,6 +86,17 @@ optimization) keeps its absolute remote URL instead. Note that some renderers �
 GitHub, notably — refuse `data:` images; Obsidian, VS Code, and Typora render
 them fine.
 
+### 5. Resizable columns on Files pages
+On the course/group/user **Files** pages, every column header gets a thin
+drag handle on its right edge. Drag it to resize the column — most usefully
+to widen **Name** so long file names stop truncating. If the columns outgrow
+the window, the table scrolls horizontally inside its own container.
+Double-click a handle to hand that column's width back to Canvas.
+
+Widths are deliberately session-only: they survive sorting and folder
+navigation (both are client-side re-renders of the same page) but reset on
+the next real page load. Nothing is persisted.
+
 ## How it works
 
 - **Favicon** — a content script (`src/favicon/favicon.js`, `document_start`)
@@ -112,6 +123,24 @@ them fine.
   section wrapper and inserts the semester-grouped list in its place. Course
   colors come from `GET /api/v1/users/self/colors` (fetched lazily, once,
   best-effort).
+
+- **Files column resize** — the new Files page renders the file list as a real
+  `<table id="files-table">` (Instructure UI) with `table-layout: fixed`, so
+  each column is exactly as wide as its `<thead>` cell — widths Canvas sets
+  inline and re-writes on every React re-render. A content script
+  (`src/files/column-resize.js`, on `…/files*` pages only) appends a drag
+  handle to each header cell and writes dragged widths into an injected
+  `<style>` sheet as
+  `#files-table thead th[data-testid="name"] { width: …px !important; }` — a
+  stylesheet `!important` beats React's inline styles, so the widths survive
+  re-renders without the script ever fighting React over the `style`
+  attribute. A `MutationObserver` re-inserts the handles whenever React
+  rebuilds the header. On drag start all keyed columns are frozen at their
+  rendered widths first; otherwise `table-layout: fixed` would redistribute
+  the dragged delta across the unsized columns and the drag would feel
+  rubbery. The companion CSS makes the table's wrapper
+  (`.FileDragOverlayContainer`) a horizontal scroller and lifts the table's
+  `max-width: 100%` cap so widened columns can overflow gracefully.
 
 - **Freeze-dry** — clicking the toolbar button opens `src/popup/popup.html`. On
   **Freeze-dry this page** the popup injects `src/content/capture-page.js` into
@@ -185,6 +214,8 @@ src/
   dashboard/dashboard.css       list styling
   tray/course-tray.js           regroups the "Courses" sidebar tray
   tray/course-tray.css          tray list styling
+  files/column-resize.js        drag-resizable Files-page columns
+  files/column-resize.css       handle styling + overflow scrolling
   popup/popup.html              toolbar-button menu
   popup/popup.css               menu styling
   popup/popup.js                menu logic (runs the actions)

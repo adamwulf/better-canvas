@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Better Canvas (Rice)",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Personal quality-of-life tweaks for canvas.rice.edu, plus actions to freeze-dry any webpage as a self-contained .html snapshot or export it as Markdown.",
   "icons": {
     "16": "icons/icon16.png",
@@ -45,6 +45,18 @@
       "matches": ["*://canvas.rice.edu/*"],
       "js": ["src/lib/terms.js", "src/lib/grouping.js", "src/tray/course-tray.js"],
       "css": ["src/tray/course-tray.css"],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": [
+        "*://canvas.rice.edu/files*",
+        "*://canvas.rice.edu/courses/*/files*",
+        "*://canvas.rice.edu/groups/*/files*",
+        "*://canvas.rice.edu/users/*/files*"
+      ],
+      "js": ["src/files/column-resize.js"],
+      "css": ["src/files/column-resize.css"],
       "run_at": "document_idle",
       "all_frames": false
     }

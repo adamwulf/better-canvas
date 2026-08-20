@@ -1,0 +1,68 @@
+/* Better Canvas (Rice) — resizable columns on the Files pages.
+ *
+ * Chrome may inject manifest CSS at user origin, where normal declarations
+ * lose to any author rule, so the two rules that must override Canvas's own
+ * styling carry !important. The rest styles only our own handle elements and
+ * has no competition.
+ */
+
+/* Anchor for the absolutely-positioned handles. */
+#files-table thead th {
+  position: relative !important;
+}
+
+/* Let the table outgrow its container once custom widths exceed it
+ * (Instructure UI caps it at max-width: 100%)... */
+#files-table {
+  max-width: none !important;
+}
+
+/* ...and let the table's wrapper scroll horizontally when that happens. */
+.FileDragOverlayContainer {
+  overflow-x: auto;
+}
+
+/* The grab strip on the right edge of each header cell. It overlays the
+ * right 9px of Canvas's sort button; clicks on it are swallowed by the
+ * script. */
+.bc-col-resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 9px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 5;
+  touch-action: none;
+  user-select: none;
+  background: transparent;
+}
+
+/* Thin affordance line, visible on hover and while dragging. */
+.bc-col-resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 15%;
+  bottom: 15%;
+  right: 3px;
+  width: 2px;
+  border-radius: 1px;
+  background: transparent;
+}
+
+.bc-col-resize-handle:hover::after {
+  background: rgba(39, 53, 64, 0.35);
+}
+
+.bc-col-resize-handle.bc-active::after {
+  background: #0374b5;
+}
+
+/* Keep the col-resize cursor and suppress text selection for the whole
+ * drag, wherever the pointer wanders. */
+html.bc-col-resizing,
+html.bc-col-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
