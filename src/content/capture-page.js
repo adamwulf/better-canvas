@@ -6,6 +6,14 @@
 // data: URIs and scripts are stripped, so the saved page opens offline in any
 // browser with no network and no JavaScript.
 //
+// Because scripts are stripped, the saved DOM must already carry the page's
+// current visual state. freeze-dry serializes each <style> by its text, so rules
+// that a runtime engine (Emotion, styled-components, adopted stylesheets) injects
+// straight into the CSSOM — leaving the <style> element empty — would be lost, and
+// components styled that way (e.g. an open sidebar/tray) collapse. We snapshot the
+// live CSSOM and re-materialize it onto the clone; see snapshotCssomStyles /
+// materializeCssom.
+//
 // Injected as a single file via chrome.scripting.executeScript({ files: [...] }).
 // The whole file is one self-invoking async IIFE, so the injection's completion
 // value IS the returned Promise — the popup awaits it and reads results[0].result.
@@ -59,6 +67,16 @@
     if (typeof freezeDry !== "function") {
       throw new Error("The vendored freeze-dry function could not be loaded.");
     }
+
+    // Snapshot the CSSOM before freeze-dry clones the live document. Runtime
+    // styling engines (Emotion, styled-components) and constructable/adopted
+    // stylesheets inject their rules straight into a sheet via insertRule, so the
+    // owning <style> element serializes EMPTY — its rules live only in
+    // sheet.cssRules, which freeze-dry never reads. We capture that text now, from
+    // the live sheets that are the source of truth, and re-materialize it onto the
+    // clone in dryResource. Taken here, before the clone, so element order still
+    // matches what freeze-dry will clone. See materializeCssom.
+    const cssomSnapshot = snapshotCssomStyles();
 
     const html = await withHardDeadline(
       freezeDry(document, {
@@ -140,6 +158,12 @@
       // Built with DOM APIs so the JSON content is quote-escaped on serialize.
       meta.setAttribute("content", JSON.stringify(metadata));
       head.appendChild(meta);
+
+      // Re-inject the runtime-only CSS captured from the live CSSOM (Emotion,
+      // styled-components, adopted stylesheets) that would otherwise be lost.
+      // Root document only: cssomSnapshot describes the top document, so applying
+      // it to a nested frame's <style> elements would be wrong.
+      materializeCssom(resource.doc, cssomSnapshot);
     }
 
     // Preload/prefetch/etc. hints describe a live network the archive can't use.
@@ -211,6 +235,81 @@
         function (error) { clearTimeout(timer); reject(error); }
       );
     });
+  }
+
+  // --- CSSOM materialization ----------------------------------------------
+
+  // Serialize a live CSSStyleSheet back to CSS text from its cssRules — the
+  // authoritative record of what the browser applies, reflecting the original
+  // text PLUS any runtime insertRule/deleteRule/mutation. Returns null for a
+  // cross-origin sheet (reading cssRules throws SecurityError) or an empty sheet;
+  // in both cases we leave freeze-dry's default handling untouched.
+  function serializeSheetToCss(sheet) {
+    try {
+      const rules = sheet.cssRules;
+      if (!rules || rules.length === 0) {
+        return null;
+      }
+      let css = "";
+      for (const rule of rules) {
+        css += rule.cssText + "\n";
+      }
+      return css;
+    } catch (error) {
+      return null; // cross-origin sheet: not readable, fetched by freeze-dry instead
+    }
+  }
+
+  // Read the live document's CSSOM once, before freeze-dry clones it. styleTexts
+  // is aligned by index with document.querySelectorAll("style") so the clone's
+  // <style> elements (same order) can be matched positionally. adopted holds the
+  // serialized constructable stylesheets, which have no backing element at all.
+  function snapshotCssomStyles() {
+    const styleTexts = [];
+    for (const styleEl of document.querySelectorAll("style")) {
+      styleTexts.push(styleEl.sheet ? serializeSheetToCss(styleEl.sheet) : null);
+    }
+    const adopted = [];
+    for (const sheet of document.adoptedStyleSheets || []) {
+      const css = serializeSheetToCss(sheet);
+      if (css) {
+        adopted.push(css);
+      }
+    }
+    return { styleTexts: styleTexts, adopted: adopted };
+  }
+
+  // Write the snapshotted CSSOM text into the CLONE. We only fill a <style> whose
+  // clone serialized EMPTY: a non-empty one was already captured — and had its
+  // url()s rewritten to data: URIs — by freeze-dry's crawl, so overwriting it
+  // would REGRESS a page that works today. That "fill only the empty ones" seam is
+  // exactly the set of sheets freeze-dry loses (rules injected via the CSSOM, not
+  // present in the element's text). Positional match by index; if the live DOM
+  // mutated between snapshot and clone the counts diverge, and we skip rather than
+  // risk mis-pairing. Known gap: url()/@font-face assets referenced only by these
+  // materialized rules are not re-crawled (this runs after freeze-dry's crawl), so
+  // such sub-resources stay as URLs; layout and color rules inline fine.
+  function materializeCssom(cloneDoc, snapshot) {
+    const cloneStyles = cloneDoc.querySelectorAll("style");
+    if (cloneStyles.length === snapshot.styleTexts.length) {
+      cloneStyles.forEach(function (styleEl, index) {
+        const css = snapshot.styleTexts[index];
+        if (css && styleEl.textContent.trim() === "") {
+          styleEl.textContent = css;
+        }
+      });
+    }
+    // Adopted stylesheets have no <style> of their own; emit fresh ones. They
+    // apply after the document's author sheets, so append at the end of <head>.
+    if (snapshot.adopted.length > 0) {
+      const head = cloneDoc.head || cloneDoc.documentElement;
+      for (const css of snapshot.adopted) {
+        const styleEl = cloneDoc.createElement("style");
+        styleEl.setAttribute("data-freezedry-adopted", "");
+        styleEl.textContent = css;
+        head.appendChild(styleEl);
+      }
+    }
   }
 
   function base64ToBytes(base64) {
