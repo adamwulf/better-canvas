@@ -242,9 +242,14 @@
   // Serialize a live CSSStyleSheet back to CSS text from its cssRules — the
   // authoritative record of what the browser applies, reflecting the original
   // text PLUS any runtime insertRule/deleteRule/mutation. Returns null for a
-  // cross-origin sheet (reading cssRules throws SecurityError) or an empty sheet;
-  // in both cases we leave freeze-dry's default handling untouched.
+  // cross-origin sheet (reading cssRules throws SecurityError), an empty sheet, or
+  // a DISABLED sheet — its rules are not applied on the live page, so re-emitting
+  // them active would add styling the user does not see. In each case we leave
+  // freeze-dry's default handling untouched.
   function serializeSheetToCss(sheet) {
+    if (sheet.disabled) {
+      return null;
+    }
     try {
       const rules = sheet.cssRules;
       if (!rules || rules.length === 0) {
@@ -264,6 +269,9 @@
   // is aligned by index with document.querySelectorAll("style") so the clone's
   // <style> elements (same order) can be matched positionally. adopted holds the
   // serialized constructable stylesheets, which have no backing element at all.
+  // Limitation (c): only the top document's adoptedStyleSheets are read. A shadow
+  // root's adopted sheets are skipped because freeze-dry does not capture shadow
+  // DOM at all, so there is no cloned shadow tree to attach them to.
   function snapshotCssomStyles() {
     const styleTexts = [];
     for (const styleEl of document.querySelectorAll("style")) {
@@ -286,9 +294,14 @@
   // exactly the set of sheets freeze-dry loses (rules injected via the CSSOM, not
   // present in the element's text). Positional match by index; if the live DOM
   // mutated between snapshot and clone the counts diverge, and we skip rather than
-  // risk mis-pairing. Known gap: url()/@font-face assets referenced only by these
-  // materialized rules are not re-crawled (this runs after freeze-dry's crawl), so
-  // such sub-resources stay as URLs; layout and color rules inline fine.
+  // risk mis-pairing.
+  // Limitation (a): url()/@font-face assets referenced only by these materialized
+  //   rules are not re-crawled (this runs after freeze-dry's crawl), so such sub-
+  //   resources stay as URLs; layout and color rules inline fine.
+  // Limitation (b): the mixed case — a <style> with authored text that ALSO had
+  //   rules added later via insertRule — keeps only the authored text. Its clone
+  //   serialized non-empty, so fill-only-empty skips it; recovering just the extra
+  //   rules would risk clobbering the url()s freeze-dry already inlined there.
   function materializeCssom(cloneDoc, snapshot) {
     const cloneStyles = cloneDoc.querySelectorAll("style");
     if (cloneStyles.length === snapshot.styleTexts.length) {
@@ -300,7 +313,9 @@
       });
     }
     // Adopted stylesheets have no <style> of their own; emit fresh ones. They
-    // apply after the document's author sheets, so append at the end of <head>.
+    // apply after the document's author sheets; appending at the end of <head> is
+    // an approximation of that cascade position — faithful unless an author <style>
+    // in <body> was meant to sit between the two, which is uncommon.
     if (snapshot.adopted.length > 0) {
       const head = cloneDoc.head || cloneDoc.documentElement;
       for (const css of snapshot.adopted) {
