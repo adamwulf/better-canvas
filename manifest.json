@@ -2,12 +2,26 @@
   "manifest_version": 3,
   "name": "Better Canvas (Rice)",
   "version": "0.1.0",
-  "description": "Personal quality-of-life tweaks for canvas.rice.edu: a custom tab favicon and a semester-grouped course list on the dashboard.",
+  "description": "Personal quality-of-life tweaks for canvas.rice.edu, plus a freeze-dry action that saves any webpage as a self-contained .html snapshot.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
+  "action": {
+    "default_title": "Better Canvas",
+    "default_popup": "src/popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "src/background/serviceworker.js"
+  },
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": ["<all_urls>"],
   "content_scripts": [
     {
       "matches": ["*://canvas.rice.edu/*"],
@@ -36,6 +50,10 @@
         "assets/canvas-favicon-48.png"
       ],
       "matches": ["*://canvas.rice.edu/*"]
+    },
+    {
+      "resources": ["src/vendor/freeze-dry.js"],
+      "matches": ["<all_urls>"]
     }
   ]
 }
