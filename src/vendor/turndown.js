@@ -157,6 +157,7 @@ var TurndownService = (function () {
       return options.linkStyle === 'inlined' && node.nodeName === 'A' && node.getAttribute('href');
     },
     replacement: function (content, node) {
+      content = collapseLinkText(content);
       var href = escapeLinkDestination(node.getAttribute('href'));
       var title = escapeLinkTitle(cleanAttribute(node.getAttribute('title')));
       var titlePart = title ? ' "' + title + '"' : '';
@@ -168,6 +169,7 @@ var TurndownService = (function () {
       return options.linkStyle === 'referenced' && node.nodeName === 'A' && node.getAttribute('href');
     },
     replacement: function (content, node, options) {
+      content = collapseLinkText(content);
       var href = escapeLinkDestination(node.getAttribute('href'));
       var title = cleanAttribute(node.getAttribute('title'));
       if (title) title = ' "' + escapeLinkTitle(title) + '"';
@@ -242,6 +244,13 @@ var TurndownService = (function () {
   };
   function cleanAttribute(attribute) {
     return attribute ? attribute.replace(/(\n+\s*)+/g, '\n') : '';
+  }
+  function collapseLinkText(content) {
+    // Anchors that wrap block elements (a common dashboard/list pattern) leave
+    // the link text padded — or split — by newlines, which would render the
+    // '[' and ']' on their own lines. Fold every newline run down to a single
+    // space and trim the ends so the link text stays inline.
+    return content.replace(/[ \t]*\n[ \t\r\n]*/g, ' ').trim();
   }
   function escapeLinkDestination(destination) {
     var escaped = destination.replace(/([<>()])/g, '\\$1');
