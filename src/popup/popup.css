@@ -1,0 +1,145 @@
+/* Better Canvas — extension button popup ("menu")
+ *
+ * A small panel that opens from the toolbar button. Each menu item is one
+ * quality-of-life action; "Freeze-dry this page" is the first. Light/dark aware
+ * so it matches the browser chrome. */
+
+:root {
+  --bc-bg: #ffffff;
+  --bc-fg: #1c1e21;
+  --bc-muted: #6b7280;
+  --bc-border: #e5e7eb;
+  --bc-hover: #f3f4f6;
+  --bc-accent: #b7292c; /* Canvas / Rice red */
+  --bc-ok: #157347;
+  --bc-err: #b42318;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bc-bg: #1f2023;
+    --bc-fg: #e7e8ea;
+    --bc-muted: #9aa0a6;
+    --bc-border: #34363a;
+    --bc-hover: #2a2c30;
+    --bc-accent: #e06a6c;
+    --bc-ok: #4ecb8a;
+    --bc-err: #f2857c;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
+  font-size: 14px;
+  color: var(--bc-fg);
+  background: var(--bc-bg);
+}
+
+.bc-popup {
+  width: 288px;
+  padding: 8px;
+}
+
+.bc-popup-head {
+  padding: 6px 8px 10px;
+  border-bottom: 1px solid var(--bc-border);
+  margin-bottom: 6px;
+}
+
+.bc-popup-title {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--bc-muted);
+}
+
+.bc-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.bc-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bc-menu-item:hover {
+  background: var(--bc-hover);
+}
+
+.bc-menu-item:focus-visible {
+  outline: 2px solid var(--bc-accent);
+  outline-offset: -2px;
+}
+
+.bc-menu-item[disabled] {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.bc-menu-icon {
+  font-size: 20px;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+
+.bc-menu-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.bc-menu-label {
+  font-weight: 600;
+}
+
+.bc-menu-desc {
+  font-size: 12px;
+  color: var(--bc-muted);
+}
+
+.bc-status {
+  min-height: 1em;
+  margin: 8px 2px 2px;
+  padding: 0 6px;
+  font-size: 12px;
+  color: var(--bc-muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.bc-status.is-working {
+  color: var(--bc-fg);
+}
+
+.bc-status.is-ok {
+  color: var(--bc-ok);
+}
+
+.bc-status.is-error {
+  color: var(--bc-err);
+}
