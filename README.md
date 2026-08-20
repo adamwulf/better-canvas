@@ -41,7 +41,10 @@ removed, so the saved file opens offline in any browser, with no network access
 and no JavaScript. It is a static snapshot of the page as you were seeing it.
 
 Browser pages (`chrome://…`) and the Chrome Web Store can't be scripted by
-extensions, so those show a short "can't be saved" message instead.
+extensions, so those show a short "can't be saved" message instead. Local
+`file://` pages work only if the extension's **Allow access to file URLs** toggle
+is on (`chrome://extensions` → the extension's Details); otherwise they show the
+same "can't be saved" message.
 
 ## How it works
 
@@ -73,6 +76,12 @@ The Canvas features send only same-origin requests to `canvas.rice.edu` using
 your existing session. Freeze-dry fetches a page's own sub-resources (the same
 ones the page already loaded) purely to inline them into the local file; the
 snapshot is never sent to any third party.
+
+Because the worker fetches with your session cookies, it refuses to pull
+internal/loopback/link-local resources (`127.0.0.1`, `169.254.169.254`, RFC-1918,
+`*.local`, …) into a snapshot of a **public** page, so a captured page cannot use
+the extension to reach your intranet. A snapshot of a **local** page (e.g. a
+`localhost` dev server) can still inline its own local resources.
 
 ## Install (load unpacked)
 
