@@ -51,14 +51,17 @@
         headers: { Accept: "application/json" }
       })
         .then(function (res) {
-          return res.ok ? res.json() : {};
+          if (!res.ok) {
+            throw new Error("/api/v1/users/self/colors -> HTTP " + res.status);
+          }
+          return res.json();
         })
         .then(function (data) {
           return (data && data.custom_colors) || {};
         })
         .catch(function (err) {
           console.warn("[BetterCanvas] course colors unavailable", err);
-          colorsPromise = null; // transient failure — retry on next tray open
+          colorsPromise = null; // failure is not cached — retry on next open
           return {};
         });
     }
@@ -127,6 +130,7 @@
 
   function parseCourses(tray, lists, headings) {
     var out = [];
+    var seen = {}; // dedupe by id, in case a course <ul> ever nests in another
     lists.forEach(function (ul) {
       var unpublished = listIsUnpublished(ul, headings);
       ul.querySelectorAll("li").forEach(function (li) {
@@ -140,10 +144,15 @@
         if (!title) {
           return;
         }
+        var id = idMatch ? idMatch[1] : href;
+        if (seen[id]) {
+          return;
+        }
+        seen[id] = true;
         var termName = extractTermName(li);
         var parsed = Terms.parseTerm(termName);
         out.push({
-          id: idMatch ? idMatch[1] : href,
+          id: id,
           href: href,
           title: title,
           termName: termName,
@@ -155,6 +164,18 @@
       });
     });
     return out;
+  }
+
+  // Fingerprint of everything that affects rendering: a same-length content
+  // swap (course replaced, publish state flipped, term changed) still forces
+  // a rebuild, not just a count change.
+  function coursesSignature(courses) {
+    return courses
+      .map(function (c) {
+        return c.id + ":" + (c.published ? "p" : "u") + ":" + (c.parsed.key || "");
+      })
+      .sort()
+      .join(",");
   }
 
   // ---- Rendering ----------------------------------------------------------
@@ -303,11 +324,14 @@
     var lists = courseLists(tray);
     var courses = parseCourses(tray, lists, headings);
 
+    var sig = coursesSignature(courses);
     var existing = tray.querySelector("#" + LIST_ID);
     if (existing) {
-      var rendered = existing.querySelectorAll(".bc-course-row").length;
-      if (rendered === courses.length) {
-        // A React re-render can un-hide the originals; keep them hidden.
+      // Keep the current list when nothing changed — and also when a React
+      // re-render momentarily parses to zero rows: removing the good list
+      // then would blank the tray until the rows come back.
+      if (!courses.length || existing.getAttribute("data-bc-signature") === sig) {
+        // A React re-render can also un-hide the originals; keep them hidden.
         hideOriginals(headings, lists);
         return;
       }
@@ -329,6 +353,7 @@
     mutating = true;
     try {
       var list = buildList(courses);
+      list.setAttribute("data-bc-signature", sig);
       anchor.parentNode.insertBefore(list, anchor);
       hideOriginals(headings, lists);
       loadColors().then(function (colors) {
