@@ -71,6 +71,13 @@
   // threads the signal into fetchResource so no new sub-resource fetches start.
   const captureController = new AbortController();
 
+  // The live-CSSOM snapshot, assigned just before freeze-dry clones (see below).
+  // Declared at function scope — NOT inside the try — so the dryResource callback,
+  // itself a function-scope declaration freeze-dry invokes during the crawl, can
+  // close over it. A const inside the try would be block-scoped and invisible to
+  // dryResource, raising "cssomSnapshot is not defined" when the crawl runs.
+  let cssomSnapshot = null;
+
   try {
     const freezeDryModule = await import(
       chrome.runtime.getURL("src/vendor/freeze-dry.js")
@@ -92,8 +99,9 @@
     // sheet.cssRules, which freeze-dry never reads. We capture that text now, from
     // the live sheets that are the source of truth, and re-materialize it onto the
     // clone in dryResource. Taken here, before the clone, so element order still
-    // matches what freeze-dry will clone. See materializeCssom.
-    const cssomSnapshot = snapshotCssomStyles();
+    // matches what freeze-dry will clone. See materializeCssom. Assigns the
+    // function-scope binding declared above so dryResource can read it.
+    cssomSnapshot = snapshotCssomStyles();
 
     const html = await withHardDeadline(
       freezeDry(document, {
