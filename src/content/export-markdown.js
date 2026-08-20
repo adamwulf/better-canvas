@@ -45,6 +45,15 @@
   // referenceizeImages() below must match this prefix.
   const TOKEN_PREFIX = "bc-inline-img:";
 
+  // Readerable classifier regexes (see isProbablyReaderable below). Declared here,
+  // before the try block, because the article path calls isProbablyReaderable while
+  // top-level execution is still inside that block — a `const` placed next to the
+  // function would still be in its temporal dead zone at that point and throw
+  // "Cannot access 'READERABLE_UNLIKELY' before initialization".
+  const READERABLE_UNLIKELY =
+    /-ad-|ai2html|banner|breadcrumbs|combx|comment|community|cover-wrap|disqus|extra|footer|gdpr|header|legends|menu|related|remark|replies|rss|shoutbox|sidebar|skyscraper|social|sponsor|supplemental|ad-break|agegate|pagination|pager|popup|yom-remote/i;
+  const READERABLE_MAYBE = /and|article|body|column|content|main|shadow/i;
+
   const pageHost = location.hostname;
   const capturedAt = new Date();
 
@@ -322,10 +331,8 @@
   // blocks (ignoring boilerplate-looking ones) and asks whether that clears a
   // small score. A list/dashboard/app screen has no such prose and scores ~0,
   // so it takes the full-page path instead of being mangled by Readability.
-  const READERABLE_UNLIKELY =
-    /-ad-|ai2html|banner|breadcrumbs|combx|comment|community|cover-wrap|disqus|extra|footer|gdpr|header|legends|menu|related|remark|replies|rss|shoutbox|sidebar|skyscraper|social|sponsor|supplemental|ad-break|agegate|pagination|pager|popup|yom-remote/i;
-  const READERABLE_MAYBE = /and|article|body|column|content|main|shadow/i;
-
+  // The READERABLE_UNLIKELY/READERABLE_MAYBE regexes it uses are declared at the
+  // top of the IIFE so they are initialized before the article path calls this.
   function isProbablyReaderable(doc) {
     const minContentLength = 140;
     const minScore = 20;
