@@ -16,7 +16,10 @@
 // link, name, published/unpublished section, and (for teachers) a
 // "SIS ID: … | Term: <term name>" detail line. The tray mounts fresh every
 // time it opens and loads its rows async, so a MutationObserver watches for
-// the loaded list and swaps in our version.
+// the loaded list and swaps in our version. Rather than hiding one assumed
+// wrapper element, each section heading and each course <ul> is hidden
+// individually, so "All Courses" and the tray footer are never touched no
+// matter how Canvas nests its sections.
 
 (function () {
   "use strict";
@@ -31,7 +34,12 @@
   var LIST_ID = "better-canvas-tray-list";
   var TRAY_SELECTOR = ".navigation-tray-container.courses-tray";
 
-  var mutating = false; // guard so our own DOM writes do not retrigger observers
+  // Written around our own DOM writes. Note: MutationObserver callbacks are
+  // delivered as microtasks, so by the time the observer fires for a write the
+  // guard has usually been reset already — it only stops same-tick re-entry.
+  // Real safety comes from processTray being idempotent: once our list is in
+  // and the originals are hidden, re-running it changes nothing.
+  var mutating = false;
   var colorsPromise = null; // lazy, cached course-color fetch
 
   // ---- Course colors (best-effort, fetched once) --------------------------
@@ -50,64 +58,100 @@
         })
         .catch(function (err) {
           console.warn("[BetterCanvas] course colors unavailable", err);
+          colorsPromise = null; // transient failure — retry on next tray open
           return {};
         });
     }
     return colorsPromise;
   }
 
-  // ---- Parse the tray's own rows ------------------------------------------
+  // ---- Find Canvas's own headings + course lists --------------------------
 
-  // Is this <li> under an "Unpublished Courses" heading? The heading is a
-  // sibling <h3> before the list; walk back from the containing <ul>.
-  function isUnpublished(li) {
-    var ul = li.closest("ul");
-    var node = ul ? ul.previousElementSibling : null;
-    while (node) {
-      if (/^h\d$/i.test(node.tagName)) {
-        return /unpublished/i.test(node.textContent || "");
-      }
-      node = node.previousElementSibling;
-    }
-    return false;
+  function isOurs(node) {
+    return !!node.closest("#" + LIST_ID);
   }
 
-  function parseCourses(tray) {
+  // The "Published Courses" / "Unpublished Courses" section headings.
+  // Deliberately NOT a bare /courses/i: that would also match the tray's
+  // "Courses" title and the "All Courses" link.
+  function sectionHeadings(tray) {
     var out = [];
-    var items = tray.querySelectorAll("li");
-    items.forEach(function (li) {
-      var link = li.querySelector("a[href*='/courses/']");
-      if (!link) {
-        return;
+    tray.querySelectorAll("h2, h3, h4").forEach(function (h) {
+      if (!isOurs(h) && /(?:un)?published\s+courses/i.test(h.textContent || "")) {
+        out.push(h);
       }
-      var href = link.getAttribute("href") || "";
-      var idMatch = href.match(/\/courses\/(\d+)/);
-      var title = (link.textContent || "").trim();
-      if (!title) {
-        return;
-      }
+    });
+    return out;
+  }
 
-      // The detail lines are sibling <div>s of the link; the term (teacher
-      // view only) appears as "SIS ID: … | Term: <name>".
-      var termName = "";
-      var divs = li.querySelectorAll("div");
-      divs.forEach(function (d) {
-        var m = (d.textContent || "").match(/(?:^|\|)\s*Term:\s*(.+?)\s*$/);
-        if (m) {
-          termName = m[1];
+  // Every <ul> holding course rows. "All Courses" links to /courses (no
+  // trailing slash) so [href*='/courses/'] cannot match it.
+  function courseLists(tray) {
+    var out = [];
+    tray.querySelectorAll("ul").forEach(function (ul) {
+      if (!isOurs(ul) && ul.querySelector("li a[href*='/courses/']")) {
+        out.push(ul);
+      }
+    });
+    return out;
+  }
+
+  // A list is unpublished when the nearest section heading BEFORE it (in
+  // document order — no sibling assumptions) says "Unpublished". Student trays
+  // have no headings at all; those courses count as published.
+  function listIsUnpublished(ul, headings) {
+    var nearest = null;
+    headings.forEach(function (h) {
+      if (h.compareDocumentPosition(ul) & Node.DOCUMENT_POSITION_FOLLOWING) {
+        nearest = h; // headings arrive in document order; last preceding wins
+      }
+    });
+    return !!nearest && /unpublished/i.test(nearest.textContent || "");
+  }
+
+  // ---- Parse the tray's own rows ------------------------------------------
+
+  // The term (teacher view only) appears in a detail line as
+  // "SIS ID: … | Term: <name>". Capture stops at any later "|" field and the
+  // line may sit in any element type, not just a <div>.
+  function extractTermName(li) {
+    var termName = "";
+    li.querySelectorAll("div, span, p").forEach(function (node) {
+      var m = (node.textContent || "").match(/(?:^|\|)\s*Term:\s*([^|]+)/);
+      if (m) {
+        termName = m[1].trim();
+      }
+    });
+    return termName;
+  }
+
+  function parseCourses(tray, lists, headings) {
+    var out = [];
+    lists.forEach(function (ul) {
+      var unpublished = listIsUnpublished(ul, headings);
+      ul.querySelectorAll("li").forEach(function (li) {
+        var link = li.querySelector("a[href*='/courses/']");
+        if (!link) {
+          return;
         }
-      });
-
-      var parsed = Terms.parseTerm(termName);
-      out.push({
-        id: idMatch ? idMatch[1] : href,
-        href: href,
-        title: title,
-        termName: termName,
-        parsed: parsed,
-        start: parsed.approxStart,
-        end: parsed.approxEnd,
-        published: !isUnpublished(li)
+        var href = link.getAttribute("href") || "";
+        var idMatch = href.match(/\/courses\/(\d+)/);
+        var title = (link.textContent || "").trim();
+        if (!title) {
+          return;
+        }
+        var termName = extractTermName(li);
+        var parsed = Terms.parseTerm(termName);
+        out.push({
+          id: idMatch ? idMatch[1] : href,
+          href: href,
+          title: title,
+          termName: termName,
+          parsed: parsed,
+          start: parsed.approxStart,
+          end: parsed.approxEnd,
+          published: !unpublished
+        });
       });
     });
     return out;
@@ -127,6 +171,8 @@
   }
 
   function renderRow(course, showTermLabel) {
+    var item = el("li", "bc-row");
+
     var row = el("a", "bc-course-row");
     row.href = course.href;
     row.setAttribute("data-bc-course-id", course.id);
@@ -161,7 +207,8 @@
       row.appendChild(badges);
     }
 
-    return row;
+    item.appendChild(row);
+    return item;
   }
 
   function renderSection(title, tag, courses, showTermLabel) {
@@ -170,15 +217,21 @@
     }
     var section = el("section", "bc-section");
 
+    // Real heading + real list, matching the semantics of the native tray
+    // (screen readers navigate the tray dialog by heading / list).
     var header = el("div", "bc-section-header");
-    header.appendChild(el("span", "bc-section-title", title));
+    header.appendChild(el("h3", "bc-section-title", title));
     if (tag) {
       header.appendChild(el("span", "bc-section-tag", tag));
     }
-    header.appendChild(el("span", "bc-section-count", String(courses.length)));
+    var count = el("span", "bc-section-count", String(courses.length));
+    count.appendChild(
+      el("span", "bc-sr-only", courses.length === 1 ? " course" : " courses")
+    );
+    header.appendChild(count);
     section.appendChild(header);
 
-    var list = el("div", "bc-rows");
+    var list = el("ul", "bc-rows");
     courses.forEach(function (c) {
       list.appendChild(renderRow(c, showTermLabel));
     });
@@ -234,49 +287,50 @@
 
   // ---- Swap the tray's list for ours --------------------------------------
 
-  // The published/unpublished sections live in one wrapper element (the shared
-  // parent of the <h3> headings / the course <ul>s). Hide that wrapper and put
-  // our grouped list in its place, leaving "All Courses" etc. untouched.
-  function sectionWrapper(tray) {
-    var headings = tray.querySelectorAll("h3");
-    for (var i = 0; i < headings.length; i++) {
-      if (/courses/i.test(headings[i].textContent || "")) {
-        return headings[i].parentElement;
+  // Hide each original heading/list element on its own (display is an
+  // attribute mutation, invisible to our childList-only observer).
+  function hideOriginals(headings, lists) {
+    headings.concat(lists).forEach(function (node) {
+      if (node.style.display !== "none") {
+        node.style.display = "none";
+        node.setAttribute("data-better-canvas-hidden", "");
       }
-    }
-    // Student trays may have no headings — fall back to the course list itself.
-    var link = tray.querySelector("ul li a[href*='/courses/']");
-    var ul = link ? link.closest("ul") : null;
-    return ul ? ul.parentElement : null;
+    });
   }
 
   function processTray(tray) {
-    if (tray.querySelector("#" + LIST_ID)) {
-      // Already ours — but a React re-render can un-hide the original wrapper.
-      var hidden = sectionWrapper(tray);
-      if (hidden && hidden.style.display !== "none") {
-        mutating = true;
-        hidden.style.display = "none";
-        hidden.setAttribute("data-better-canvas-hidden", "");
-        mutating = false;
+    var headings = sectionHeadings(tray);
+    var lists = courseLists(tray);
+    var courses = parseCourses(tray, lists, headings);
+
+    var existing = tray.querySelector("#" + LIST_ID);
+    if (existing) {
+      var rendered = existing.querySelectorAll(".bc-course-row").length;
+      if (rendered === courses.length) {
+        // A React re-render can un-hide the originals; keep them hidden.
+        hideOriginals(headings, lists);
+        return;
       }
-      return;
+      // The tray's course set changed after our first build (rows can arrive
+      // in batches while the tray loads) — rebuild from the fresh parse.
+      mutating = true;
+      existing.remove();
+      mutating = false;
     }
-    var courses = parseCourses(tray);
+
     if (!courses.length) {
       return; // rows not loaded yet
     }
-    var wrapper = sectionWrapper(tray);
-    if (!wrapper || !wrapper.parentNode) {
+    var anchor = headings[0] || lists[0];
+    if (!anchor || !anchor.parentNode) {
       return;
     }
 
     mutating = true;
     try {
       var list = buildList(courses);
-      wrapper.parentNode.insertBefore(list, wrapper);
-      wrapper.style.display = "none";
-      wrapper.setAttribute("data-better-canvas-hidden", "");
+      anchor.parentNode.insertBefore(list, anchor);
+      hideOriginals(headings, lists);
       loadColors().then(function (colors) {
         applyColors(list, colors);
       });
