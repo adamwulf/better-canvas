@@ -49,6 +49,15 @@ async function fetchResource(rawUrl, pageHost) {
   // the page being captured is ITSELF an internal/local page, its own internal
   // sub-resources are legitimate, so we only block internal targets when the
   // page's own host is not internal.
+  //
+  // Two limits are inherent to a lexical guard in a browser and are accepted:
+  //   1. A public DNS name that resolves to an internal IP (DNS-rebinding style)
+  //      passes the name check — the browser resolves DNS, we never see the IP.
+  //   2. redirect: "follow" below issues the request to a redirected host before
+  //      the post-redirect check can run, so a public->internal 3xx still makes a
+  //      blind GET; only inlining the response is blocked. (redirect: "manual"
+  //      cannot read the cross-origin Location to validate hops, and redirect:
+  //      "error" would drop legitimate redirected resources like Canvas file URLs.)
   var pageIsInternal = isInternalHost(pageHost);
   if (isInternalHost(url.hostname) && !pageIsInternal) {
     throw new Error("Refusing to fetch internal host: " + url.hostname);
@@ -119,11 +128,6 @@ function isInternalHost(hostname) {
   if (/(^|\.)(local|internal|localhost)$/.test(host)) {
     return true;
   }
-  // IPv4-mapped IPv6 in dotted form (::ffff:127.0.0.1) → test the embedded IPv4.
-  var mapped = host.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/);
-  if (mapped) {
-    return isInternalIPv4(mapped[1]);
-  }
   if (host.indexOf(":") !== -1) {
     return isInternalIPv6(host);
   }
@@ -158,17 +162,94 @@ function isInternalIPv4(ip) {
   return false;
 }
 
+// Chrome serializes IPv4-mapped IPv6 to hex — http://[::ffff:127.0.0.1]/ has
+// hostname [::ffff:7f00:1], and 169.254.169.254 becomes [::ffff:a9fe:a9fe] — so a
+// string match on the dotted form misses them. We parse the address to 16 bytes
+// and range-check, including the IPv4 embedded by the mapped (::ffff:0:0/96),
+// compatible (::/96), and NAT64 (64:ff9b::/96) prefixes. Unparseable → unsafe.
 function isInternalIPv6(host) {
-  if (host === "::1" || host === "::") {
-    return true; // loopback / unspecified
+  var bytes = parseIPv6ToBytes(host);
+  if (!bytes) {
+    return true; // fail closed: an address we cannot decode is not proven safe
   }
-  if (/^fe[89a-f]/.test(host)) {
-    return true; // fe80::/10 link-local (+ deprecated fec0::/10 site-local)
+  var leading15Zero = bytes.slice(0, 15).every(function (x) { return x === 0; });
+  if (leading15Zero && (bytes[15] === 0 || bytes[15] === 1)) {
+    return true; // :: unspecified / ::1 loopback
   }
-  if (/^f[cd]/.test(host)) {
+  if (bytes[0] === 0xfe && (bytes[1] & 0x80) === 0x80) {
+    return true; // fe80::/9: fe80::/10 link-local + fec0::/10 deprecated site-local
+  }
+  if ((bytes[0] & 0xfe) === 0xfc) {
     return true; // fc00::/7 unique local
   }
+  var isMapped = bytes.slice(0, 10).every(function (x) { return x === 0; }) &&
+    bytes[10] === 0xff && bytes[11] === 0xff; // ::ffff:0:0/96
+  var isCompat = bytes.slice(0, 12).every(function (x) { return x === 0; }); // ::/96
+  var isNat64 = bytes[0] === 0x00 && bytes[1] === 0x64 && bytes[2] === 0xff &&
+    bytes[3] === 0x9b && bytes.slice(4, 12).every(function (x) { return x === 0; }); // 64:ff9b::/96
+  if (isMapped || isCompat || isNat64) {
+    return isInternalIPv4(bytes.slice(12, 16).join("."));
+  }
   return false;
+}
+
+// Parse a bracket-stripped, lowercased IPv6 host (optionally with one "::"
+// compression and/or an embedded trailing dotted IPv4) into a 16-byte array, or
+// null if it is not a well-formed IPv6 literal.
+function parseIPv6ToBytes(host) {
+  var text = host;
+  // Fold an embedded trailing dotted IPv4 (::ffff:1.2.3.4) into two hex groups.
+  var tail = text.match(/^(.*:)(\d{1,3}(?:\.\d{1,3}){3})$/);
+  if (tail) {
+    var quad = tail[2].split(".").map(function (n) { return parseInt(n, 10); });
+    if (quad.some(function (n) { return isNaN(n) || n < 0 || n > 255; })) {
+      return null;
+    }
+    text = tail[1] +
+      (((quad[0] << 8) | quad[1]).toString(16)) + ":" +
+      (((quad[2] << 8) | quad[3]).toString(16));
+  }
+  var halves = text.split("::");
+  if (halves.length > 2) {
+    return null;
+  }
+  var head = toHexGroups(halves[0]);
+  var back = halves.length === 2 ? toHexGroups(halves[1]) : [];
+  if (head === null || back === null) {
+    return null;
+  }
+  var groups;
+  if (halves.length === 2) {
+    var missing = 8 - (head.length + back.length);
+    if (missing < 1) {
+      return null; // "::" must stand for at least one zero group
+    }
+    groups = head.concat(new Array(missing).fill("0")).concat(back);
+  } else {
+    groups = head;
+  }
+  if (groups.length !== 8) {
+    return null;
+  }
+  var bytes = [];
+  for (var i = 0; i < 8; i += 1) {
+    var value = parseInt(groups[i], 16);
+    bytes.push((value >> 8) & 255, value & 255);
+  }
+  return bytes;
+}
+
+function toHexGroups(part) {
+  if (part === "") {
+    return [];
+  }
+  var groups = part.split(":");
+  for (var i = 0; i < groups.length; i += 1) {
+    if (!/^[0-9a-f]{1,4}$/.test(groups[i])) {
+      return null;
+    }
+  }
+  return groups;
 }
 
 function arrayBufferToBase64(buffer) {
