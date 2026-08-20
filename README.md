@@ -12,8 +12,9 @@ Every `canvas.rice.edu` tab shows the bundled Canvas logo as its favicon, so
 Canvas tabs are easy to pick out. The icon is re-applied if Canvas swaps it back
 during single-page navigation.
 
-### 2. Semester-grouped course list on the dashboard
-The dashboard's card grid is replaced with a compact list, grouped into four
+### 2. Semester-grouped course list on the dashboard and in the sidebar
+The dashboard's card grid — and the course list inside the global-nav
+**Courses** sidebar tray — are replaced with a compact list, grouped into four
 sections:
 
 - **Next semester** (the upcoming semester) — at the top
@@ -32,6 +33,10 @@ Which semester counts as "current" is decided from real Canvas term start/end
 dates when available, and otherwise from an approximate academic calendar built
 from the term name. Today (mid-August), Fall is upcoming, so the current
 semester is the just-finishing Summer term and Fall shows as **Next**.
+
+In the sidebar tray, Canvas's own "Published Courses" / "Unpublished Courses"
+split is replaced by the same four semester groups; the tray's **All Courses**
+link and footer text are left as-is.
 
 ### 3. Freeze-dry any webpage
 Click the extension's toolbar button on **any** site to open a small menu, then
@@ -94,7 +99,19 @@ them fine.
   - `GET /api/v1/users/self/colors` — each course's color swatch.
 
   If the API is unreachable, it falls back to scraping the already-rendered
-  dashboard cards. Grouping logic lives in `src/lib/terms.js`.
+  dashboard cards. Term parsing lives in `src/lib/terms.js` and the semester
+  bucketing shared with the tray in `src/lib/grouping.js`.
+
+- **Sidebar tray** — Canvas renders the "Courses" tray with React into
+  `#nav-tray-portal` each time it opens, loading the rows async. A content
+  script (`src/tray/course-tray.js`, injected on every Canvas page) watches
+  with a `MutationObserver`, and when the loaded tray appears it reads the
+  courses straight from the tray's own DOM: link + title from each row,
+  published/unpublished from the section heading the row sits under, and the
+  term from the row's `… | Term: <name>` detail line. It then hides Canvas's
+  section wrapper and inserts the semester-grouped list in its place. Course
+  colors come from `GET /api/v1/users/self/colors` (fetched lazily, once,
+  best-effort).
 
 - **Freeze-dry** — clicking the toolbar button opens `src/popup/popup.html`. On
   **Freeze-dry this page** the popup injects `src/content/capture-page.js` into
@@ -161,10 +178,13 @@ icons/                          extension icons (16 / 48 / 128)
 assets/                         tab favicon PNGs (16 / 32 / 48)
 src/
   favicon/favicon.js            swaps the tab favicon
-  lib/terms.js                  term parsing + semester grouping
+  lib/terms.js                  term parsing (season/year/sub-term)
+  lib/grouping.js               semester bucketing (next/current/previous/older)
   lib/image-optimizer.js        shared Allume-mirrored image shrinker
   dashboard/dashboard.js        builds the grouped course list
   dashboard/dashboard.css       list styling
+  tray/course-tray.js           regroups the "Courses" sidebar tray
+  tray/course-tray.css          tray list styling
   popup/popup.html              toolbar-button menu
   popup/popup.css               menu styling
   popup/popup.js                menu logic (runs the actions)
