@@ -1,6 +1,7 @@
 // Better Canvas — service worker (Manifest V3)
 //
-// Sole job: proxy cross-origin sub-resource fetches for the freeze-dry capture.
+// Sole job: proxy cross-origin sub-resource fetches for the freeze-dry capture
+// and the Markdown export's image inlining.
 //
 // A content script running in the page cannot read cross-origin sub-resources
 // (images, fonts, stylesheets on CDNs) — CORS blocks the response body. This

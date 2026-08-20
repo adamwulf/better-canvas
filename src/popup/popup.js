@@ -1,21 +1,61 @@
 // Better Canvas — popup ("menu") logic
 //
-// Wires the toolbar-button menu. "Freeze-dry this page" injects the capture
-// script into the active tab and reports the result. The injected script does the
-// freeze-dry AND triggers the download itself (in the page), so the save still
-// completes even if this popup is closed first; the status shown here is a
-// best-effort confirmation while the popup remains open.
+// Wires the toolbar-button menu. Each action injects a content script into the
+// active tab and reports the result. The injected script does the work AND
+// triggers the download itself (in the page), so the save still completes even
+// if this popup is closed first; the status shown here is a best-effort
+// confirmation while the popup remains open.
+//
+// "Export as Markdown" needs the vendored Readability/Turndown libraries in the
+// tab before its own script runs. Injections into the same tab land in the same
+// isolated world, where classic-script globals persist across executeScript
+// calls (the dashboard scripts rely on the same behavior), so the action's file
+// groups are injected sequentially and the LAST group's result is the outcome.
 
 (function () {
   "use strict";
 
-  var button = document.getElementById("bc-freeze-dry");
   var statusEl = document.getElementById("bc-status");
   var busy = false;
+
+  var ACTIONS = [
+    {
+      buttonId: "bc-freeze-dry",
+      workingText: "Freeze-drying this page…",
+      injections: [["src/content/capture-page.js"]]
+    },
+    {
+      buttonId: "bc-export-md",
+      workingText: "Converting this page to Markdown…",
+      injections: [
+        [
+          "src/vendor/readability.js",
+          "src/vendor/turndown.js",
+          "src/vendor/turndown-plugin-gfm.js"
+        ],
+        ["src/content/export-markdown.js"]
+      ]
+    }
+  ];
+
+  var buttons = ACTIONS.map(function (action) {
+    return document.getElementById(action.buttonId);
+  });
 
   function setStatus(text, kind) {
     statusEl.textContent = text || "";
     statusEl.className = "bc-status" + (kind ? " is-" + kind : "");
+  }
+
+  function setBusy(value) {
+    busy = value;
+    buttons.forEach(function (button) {
+      if (value) {
+        button.setAttribute("disabled", "");
+      } else {
+        button.removeAttribute("disabled");
+      }
+    });
   }
 
   function formatBytes(bytes) {
@@ -30,6 +70,25 @@
       return Math.round(kb) + " KB";
     }
     return (kb / 1024).toFixed(1) + " MB";
+  }
+
+  // "Saved foo.md (12 KB, article)" — the Markdown export reports whether the
+  // readable article or the whole page was converted; freeze-dry has no mode.
+  function describeResult(result) {
+    var details = [];
+    var size = formatBytes(result.bytes);
+    if (size) {
+      details.push(size);
+    }
+    if (result.mode === "article") {
+      details.push("article");
+    } else if (result.mode === "page") {
+      details.push("full page");
+    }
+    return (
+      "Saved " + result.filename +
+      (details.length ? " (" + details.join(", ") + ")" : "")
+    );
   }
 
   // Pages the browser refuses to let extensions script. We check the scheme up
@@ -67,13 +126,28 @@
       });
   }
 
-  function runCapture() {
+  // Inject each file group in order into the same tab; resolve with the LAST
+  // group's results (the action's own script — vendor groups only define
+  // globals for it).
+  function injectSequentially(tabId, injections) {
+    var chain = Promise.resolve(null);
+    injections.forEach(function (files) {
+      chain = chain.then(function () {
+        return chrome.scripting.executeScript({
+          target: { tabId: tabId },
+          files: files
+        });
+      });
+    });
+    return chain;
+  }
+
+  function runAction(action) {
     if (busy) {
       return;
     }
-    busy = true;
-    button.setAttribute("disabled", "");
-    setStatus("Freeze-drying this page…", "working");
+    setBusy(true);
+    setStatus(action.workingText, "working");
 
     getActiveTab()
       .then(function (tab) {
@@ -86,15 +160,13 @@
           friendly.friendly = true;
           throw friendly;
         }
-        return chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          files: ["src/content/capture-page.js"]
-        });
+        return injectSequentially(tab.id, action.injections);
       })
       .then(function (results) {
         var result = results && results[0] ? results[0].result : null;
         // Errors thrown from here are real capture results — their messages come
-        // from freeze-dry and should be shown verbatim, not rewritten below.
+        // from the injected script and should be shown verbatim, not rewritten
+        // below.
         var captured;
         if (!result) {
           captured = new Error("The page could not be captured.");
@@ -105,11 +177,7 @@
           captured.captured = true;
           throw captured;
         }
-        var size = formatBytes(result.bytes);
-        setStatus(
-          "Saved " + result.filename + (size ? " (" + size + ")" : ""),
-          "ok"
-        );
+        setStatus(describeResult(result), "ok");
       })
       .catch(function (error) {
         var message = error && error.message ? error.message : String(error);
@@ -123,10 +191,13 @@
         setStatus(isInjectionFailure ? "This page can't be saved." : message, "error");
       })
       .then(function () {
-        busy = false;
-        button.removeAttribute("disabled");
+        setBusy(false);
       });
   }
 
-  button.addEventListener("click", runCapture);
+  ACTIONS.forEach(function (action, index) {
+    buttons[index].addEventListener("click", function () {
+      runAction(action);
+    });
+  });
 })();
