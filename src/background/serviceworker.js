@@ -188,7 +188,10 @@ function isInternalIPv6(host) {
   var isNat64 = bytes[0] === 0x00 && bytes[1] === 0x64 && bytes[2] === 0xff &&
     bytes[3] === 0x9b && bytes.slice(4, 12).every(function (x) { return x === 0; }); // 64:ff9b::/96
   if (isMapped || isCompat || isNat64) {
-    return isInternalIPv4(bytes.slice(12, 16).join("."));
+    return isInternalIPv4(bytes.slice(12, 16).join(".")); // IPv4 in the low 32 bits
+  }
+  if (bytes[0] === 0x20 && bytes[1] === 0x02) {
+    return isInternalIPv4(bytes.slice(2, 6).join(".")); // 6to4 2002::/16: IPv4 in bytes 2-5
   }
   return false;
 }
