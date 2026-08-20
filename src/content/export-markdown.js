@@ -316,8 +316,8 @@
 
   // --- article detection ----------------------------------------------------
 
-  // Ported from @mozilla/readability's Readability-readerable.js (MIT, the same
-  // project as the vendored Readability). Returns true when the page reads like
+  // Ported from @mozilla/readability's Readability-readerable.js (Apache-2.0,
+  // the same project as the vendored Readability). Returns true when it reads like
   // a prose article: it sums sqrt(text length) over visible <p>/<pre>/<article>
   // blocks (ignoring boilerplate-looking ones) and asks whether that clears a
   // small score. A list/dashboard/app screen has no such prose and scores ~0,
@@ -379,9 +379,10 @@
   // --- full-page fallback cleanup -------------------------------------------
 
   // Drop elements that can never contribute to Markdown (code, styling, frames,
-  // media chrome) plus anything the page itself marks as hidden. Nav/footer
-  // link lists are deliberately KEPT — in fallback mode the user asked for the
-  // whole page.
+  // media chrome) plus anything the page itself marks as hidden. Navigation
+  // landmarks and interactive controls are removed separately by stripChrome;
+  // ordinary link lists that are neither (a plain footer, say) stay — in the
+  // full-page path the user asked for the whole page.
   function stripNonContent(container) {
     const selector = [
       "script", "style", "noscript", "template", "iframe", "frame",
@@ -424,28 +425,31 @@
     return clone;
   }
 
-  // True when the live element paints nothing. display:none (from any source)
-  // produces no client rects at all — the whole subtree is hidden, so dropping
-  // it is safe. visibility:hidden/collapse still occupies space (it has rects),
-  // and a descendant may set visibility:visible to re-show itself; so it is only
-  // treated as hidden when the element has no element children, otherwise a
-  // hidden wrapper could take a visible child down with it. Screen-reader-only
-  // text (clipped / off-screen) still paints, so it is KEPT — it often carries
-  // the accessible label we want (a due date, the points possible). Reads only
-  // the live DOM; never mutates it.
+  // True when the live element paints nothing AND removing it drops nothing the
+  // reader can see. No client rects usually means display:none (from any source)
+  // — the whole subtree is hidden, safe to drop. The exception is display:contents:
+  // it also has no box of its own, but its children render in its place, so it is
+  // KEPT (a hidden child, if any, is dropped on its own). visibility:hidden/collapse
+  // still occupies space (it has rects) and a descendant may set visibility:visible
+  // to re-show itself, so it is treated as hidden only for a childless element —
+  // otherwise a hidden wrapper could take a visible child down with it. Screen-
+  // reader-only text (clipped / off-screen) still paints, so it too is KEPT — it
+  // often carries the accessible label we want (a due date, the points possible).
+  // Reads only the live DOM; never mutates it.
   function isRenderedHidden(el, view) {
+    const computeStyle =
+      view && typeof view.getComputedStyle === "function"
+        ? function () { return view.getComputedStyle(el); }
+        : function () { return null; };
     if (
       typeof el.getClientRects === "function" &&
       el.getClientRects().length === 0
     ) {
-      return true;
+      const style = computeStyle();
+      return !(style && style.display === "contents");
     }
-    if (
-      el.childElementCount === 0 &&
-      view &&
-      typeof view.getComputedStyle === "function"
-    ) {
-      const style = view.getComputedStyle(el);
+    if (el.childElementCount === 0) {
+      const style = computeStyle();
       if (
         style &&
         (style.visibility === "hidden" || style.visibility === "collapse")
@@ -468,7 +472,7 @@
       '[role="button"]', '[role="menu"]', '[role="menubar"]',
       '[role="toolbar"]', '[role="tab"]', '[role="tablist"]',
       '[role="dialog"]', '[role="alertdialog"]', '[role="search"]',
-      '[role="tooltip"]', '[contenteditable="true"]'
+      '[role="tooltip"]'
     ].join(", ");
     for (const node of container.querySelectorAll(selector)) {
       node.remove();
