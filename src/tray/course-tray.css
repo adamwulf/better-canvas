@@ -15,7 +15,7 @@
 #better-canvas-tray-list .bc-section-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   margin: 0 0 6px 0;
 }
 
@@ -45,9 +45,16 @@
 }
 
 #better-canvas-tray-list .bc-section-count {
+  /* Right-aligned when the section has no pill; the auto margin below is
+     cancelled when a pill precedes it, so the two never split the free space
+     and center the pill. */
   margin-left: auto;
   font-size: 0.7rem;
   color: #8a959e;
+}
+
+#better-canvas-tray-list .bc-section-tag + .bc-section-count {
+  margin-left: 0;
 }
 
 /* Screen-reader-only text (e.g. the " courses" suffix on section counts). */
