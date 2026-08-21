@@ -2,26 +2,12 @@
   "manifest_version": 3,
   "name": "Better Canvas (Rice)",
   "version": "0.5.0",
-  "description": "Personal quality-of-life tweaks for canvas.rice.edu, plus actions to freeze-dry any webpage as a self-contained .html snapshot or export it as Markdown.",
+  "description": "Personal quality-of-life tweaks for canvas.rice.edu.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "action": {
-    "default_title": "Better Canvas",
-    "default_popup": "src/popup/popup.html",
-    "default_icon": {
-      "16": "icons/icon16.png",
-      "48": "icons/icon48.png",
-      "128": "icons/icon128.png"
-    }
-  },
-  "background": {
-    "service_worker": "src/background/serviceworker.js"
-  },
-  "permissions": ["activeTab", "scripting"],
-  "host_permissions": ["<all_urls>"],
   "content_scripts": [
     {
       "matches": ["*://canvas.rice.edu/*"],
@@ -69,10 +55,6 @@
         "assets/canvas-favicon-48.png"
       ],
       "matches": ["*://canvas.rice.edu/*"]
-    },
-    {
-      "resources": ["src/vendor/freeze-dry.js"],
-      "matches": ["<all_urls>"]
     }
   ]
 }

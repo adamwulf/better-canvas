@@ -1,9 +1,10 @@
 # Better Canvas (Rice)
 
 A personal, unpacked Chrome extension with quality-of-life tweaks for
-[canvas.rice.edu](https://canvas.rice.edu), plus two save-this-page actions that
-work on any site: **freeze-dry** (a self-contained `.html` snapshot) and
-**Markdown export** (a readable `.md` file). Built for personal use.
+[canvas.rice.edu](https://canvas.rice.edu). Built for personal use.
+
+> The freeze-dry / Markdown "save this page" actions that used to live here have
+> moved to a separate, standalone extension. Better Canvas is now Canvas-only.
 
 ## Features
 
@@ -38,55 +39,7 @@ In the sidebar tray, Canvas's own "Published Courses" / "Unpublished Courses"
 split is replaced by the same four semester groups; the tray's **All Courses**
 link and footer text are left as-is.
 
-### 3. Freeze-dry any webpage
-Click the extension's toolbar button on **any** site to open a small menu, then
-choose **Freeze-dry this page**. The live page — including pages behind a login —
-is serialized into one self-contained `.html` file, which downloads to your
-computer. CSS, images, and fonts are inlined as `data:` URIs and scripts are
-removed, so the saved file opens offline in any browser, with no network access
-and no JavaScript. It is a static snapshot of the page as you were seeing it.
-
-To keep snapshots small, jpeg/png images referenced by `<img>`/`<picture>` are
-re-encoded as webp (quality 0.82) on the way in, and the webp is kept only when
-it saves at least max(512 bytes, 5%). This mirrors the Allume browser
-extension's pipeline, including its guards (byte-sniffed type, animated-PNG
-bail, dimension limits, fail-soft to the original bytes) and its rule that
-images are **never resized** here — intrinsic raster size participates in
-layout when the archived page reloads. CSS background images are inlined
-untouched, also like Allume.
-
-Browser pages (`chrome://…`) and the Chrome Web Store can't be scripted by
-extensions, so those show a short "can't be saved" message instead. Local
-`file://` pages work only if the extension's **Allow access to file URLs** toggle
-is on (`chrome://extensions` → the extension's Details); otherwise they show the
-same "can't be saved" message. (Both restrictions apply to the Markdown export
-too.)
-
-### 4. Export any webpage as Markdown
-The same toolbar menu has **Export as Markdown**. The page's readable article is
-extracted with Mozilla's [Readability](https://github.com/mozilla/readability)
-(the Firefox Reader View engine) and converted to GitHub-flavored Markdown with
-[Turndown](https://github.com/mixmark-io/turndown), then downloaded as a `.md`
-file. When Readability finds no real article — a company homepage, a dashboard —
-the **whole page body** is converted instead (scripts, styles, and hidden
-elements stripped), so the export never comes back empty. The popup's status
-line says which mode ran: `article` or `full page`.
-
-Images are inlined as `data:` URIs (fetched through the same service-worker
-proxy and SSRF guard as freeze-dry), so the `.md` stays self-contained even for
-images behind your login. Each one runs through the same Allume-mirrored
-webp-or-original pipeline as freeze-dry, with one Markdown-only addition: since
-a `.md` file has no layout dependency on intrinsic image size, each image is
-also downscaled to the size it actually occupied on the page (rendered CSS size
-× devicePixelRatio, capped at 2 — never upscaled) before encoding. The base64
-blobs sit at the *bottom* of the file as reference-style definitions
-(`![alt][img0]` … `[img0]: data:…`), keeping the body readable in a text
-editor. An image that can't be fetched (or is bigger than 8 MB after
-optimization) keeps its absolute remote URL instead. Note that some renderers —
-GitHub, notably — refuse `data:` images; Obsidian, VS Code, and Typora render
-them fine.
-
-### 5. Resizable columns on Files pages
+### 3. Resizable columns on Files pages
 On the course/group/user **Files** pages, every column header gets a thin
 drag handle on its right edge. Drag it to resize the column — most usefully
 to widen **Name** so long file names stop truncating. If the columns outgrow
@@ -142,52 +95,8 @@ the next real page load. Nothing is persisted.
   (`.FileDragOverlayContainer`) a horizontal scroller and lifts the table's
   `max-width: 100%` cap so widened columns can overflow gracefully.
 
-- **Freeze-dry** — clicking the toolbar button opens `src/popup/popup.html`. On
-  **Freeze-dry this page** the popup injects `src/content/capture-page.js` into
-  the active tab (`chrome.scripting.executeScript`). That script dynamic-imports
-  the vendored [WebMemex freeze-dry](https://github.com/WebMemex/freeze-dry)
-  bundle (`src/vendor/freeze-dry.js`), which clones the DOM and inlines every
-  sub-resource. Cross-origin sub-resources (CDN images, fonts) can't be read by a
-  content script because of CORS, so each one is fetched through the service
-  worker (`src/background/serviceworker.js`), which carries the extension's host
-  permission. Fetched jpeg/png images referenced by `<img>`/`<picture>` are run
-  through the shared optimizer (`src/lib/image-optimizer.js`, injected first)
-  before inlining. The finished `.html` is downloaded from the page itself via a
-  `Blob` URL — nothing is uploaded anywhere.
-
-- **Markdown export** — on **Export as Markdown** the popup first injects the
-  vendored classic scripts (`src/vendor/readability.js`, `turndown.js`,
-  `turndown-plugin-gfm.js`) plus the shared optimizer, then
-  `src/content/export-markdown.js`, into the active tab. That script runs
-  Readability on a *clone* of the document (Readability mutates its input; each
-  live image's `currentSrc` is copied onto the clone first so
-  lazy-loaded/srcset images survive). If the extracted article's text is under
-  500 characters the page counts as "no article" and a cleaned clone of the
-  whole `<body>` is converted instead. Article images are fetched through the
-  same `BC_FETCH_RESOURCE` worker proxy as freeze-dry, optimized
-  (webp-or-original + rendered-size downscale), and swapped to `data:` URIs,
-  and Turndown (+ its GFM plugin) produces the final Markdown, downloaded via a
-  `Blob` URL like freeze-dry.
-
-- **Image optimizer** — `src/lib/image-optimizer.js` (global
-  `BCImageOptimizer`) is a port of the image pipeline in the Allume browser
-  extension (`muse-ios/BrowserExtension/src/content/capture-page.js`): its
-  constants (webp quality 0.82, 32 MB input cap, 16384-px / 16M-pixel dimension
-  guards, ≥ max(512 B, 5%) savings rule, two-slot codec semaphore, 2.5 s
-  per-attempt budget) and its byte-sniffing guards (`inspectPng`,
-  `inspectJpeg`) are copied from there. The rendered-size downscale is this
-  repo's Markdown-only extension of that pipeline.
-
 The Canvas features send only same-origin requests to `canvas.rice.edu` using
-your existing session. Freeze-dry fetches a page's own sub-resources (the same
-ones the page already loaded) purely to inline them into the local file; the
-snapshot is never sent to any third party.
-
-Because the worker fetches with your session cookies, it refuses to pull
-internal/loopback/link-local resources (`127.0.0.1`, `169.254.169.254`, RFC-1918,
-`*.local`, …) into a snapshot of a **public** page, so a captured page cannot use
-the extension to reach your intranet. A snapshot of a **local** page (e.g. a
-`localhost` dev server) can still inline its own local resources.
+your existing session.
 
 ## Install (load unpacked)
 
@@ -209,24 +118,12 @@ src/
   favicon/favicon.js            swaps the tab favicon
   lib/terms.js                  term parsing (season/year/sub-term)
   lib/grouping.js               semester bucketing (next/current/previous/older)
-  lib/image-optimizer.js        shared Allume-mirrored image shrinker
   dashboard/dashboard.js        builds the grouped course list
   dashboard/dashboard.css       list styling
   tray/course-tray.js           regroups the "Courses" sidebar tray
   tray/course-tray.css          tray list styling
   files/column-resize.js        drag-resizable Files-page columns
   files/column-resize.css       handle styling + overflow scrolling
-  popup/popup.html              toolbar-button menu
-  popup/popup.css               menu styling
-  popup/popup.js                menu logic (runs the actions)
-  content/capture-page.js       freeze-dries the page + downloads it
-  content/export-markdown.js    Readability→Turndown export + download
-  background/serviceworker.js   cross-origin sub-resource fetch proxy
-  vendor/freeze-dry.js          vendored WebMemex freeze-dry bundle
-  vendor/readability.js         vendored @mozilla/readability 0.6.0
-  vendor/turndown.js            vendored turndown 7.2.4
-  vendor/turndown-plugin-gfm.js vendored turndown-plugin-gfm 1.0.2
-  vendor/README.md              bundle provenance + the process shim
 ```
 
 ## Notes & next steps
@@ -236,11 +133,3 @@ src/
 - The "current vs. next" boundary uses an approximate calendar when Canvas does
   not expose real term dates. If a specific semester should land differently,
   the season date ranges are in `src/lib/terms.js` (`SEASONS`).
-- Freeze-dry targets Chrome (MV3). Very large pages produce large files, and a
-  page that keeps rendering after "load" is captured as it looked at that
-  instant. If a sub-resource hangs, the capture gives up after a hard deadline.
-- The Markdown export decides article-vs-full-page with a 500-character
-  threshold (`MIN_ARTICLE_CHARS` in `src/content/export-markdown.js`); adjust it
-  if a page lands in the wrong mode.
-- To regenerate the freeze-dry bundle, see `src/vendor/README.md` — the file is
-  committed as-is and this repo has no build step.
