@@ -115,7 +115,9 @@
       originalName: card.originalName || "",
       termName: termName,
       parsed: parsed,
-      start: realStart || parsed.approxStart,
+      // Switch to this semester one day before its real Canvas start; with no
+      // real date, fall back to the SEASONS approximation (e.g. Fall = Aug 20).
+      start: Terms.switchoverFromRealStart(realStart) || parsed.approxStart,
       end: realEnd || parsed.approxEnd,
       published: published,
       color: colors["course_" + id] || card.color || card.backgroundColor || null,
