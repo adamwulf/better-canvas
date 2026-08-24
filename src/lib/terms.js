@@ -19,16 +19,38 @@
 (function () {
   "use strict";
 
-  // Chronological order within a calendar year. Higher index = later in the year.
-  // Approximate start/end (month is 0-based) model a typical academic calendar;
-  // they are only used when Canvas provides no real term dates.
+  // These seasons are in calendar order. A higher index is later in the year.
+  // The approximate start/end dates (month is 0-based) show a typical academic
+  // calendar. The code uses them only when Canvas gives no real term dates.
+  // Each season "start" is also its fallback changeover date: on that date the
+  // code makes the season "current" (see pickRelativeSemesters). The summer to
+  // fall changeover is Aug 20. When Canvas gives a real term start,
+  // switchoverFromRealStart moves the changeover to one day before it instead.
   var SEASONS = {
     winter: { index: 0, label: "Winter", start: [0, 2], end: [0, 31] },
     january: { index: 0, label: "January", start: [0, 2], end: [0, 31] },
     spring: { index: 1, label: "Spring", start: [0, 12], end: [4, 10] },
     summer: { index: 2, label: "Summer", start: [5, 1], end: [7, 15] },
-    fall: { index: 3, label: "Fall", start: [7, 25], end: [11, 18] }
+    fall: { index: 3, label: "Fall", start: [7, 20], end: [11, 18] }
   };
+
+  // REAL_START_LEAD_DAYS is the number of days before a real Canvas term start.
+  // On that earlier day the code makes the semester "current". Canvas gives the
+  // official first day; the new semester must read as current one day before it.
+  var REAL_START_LEAD_DAYS = 1;
+
+  // switchoverFromRealStart returns the changeover date for a real Canvas term
+  // start. This date is REAL_START_LEAD_DAYS before the official start. It
+  // returns null when there is no real date, so the caller can fall back to the
+  // SEASONS approximation with "|| parsed.approxStart".
+  function switchoverFromRealStart(realStart) {
+    if (!realStart) {
+      return null;
+    }
+    var d = new Date(realStart.getTime());
+    d.setDate(d.getDate() - REAL_START_LEAD_DAYS);
+    return d;
+  }
 
   function seasonFromName(name) {
     var lower = name.toLowerCase();
@@ -154,7 +176,9 @@
 
   window.BetterCanvasTerms = {
     SEASONS: SEASONS,
+    REAL_START_LEAD_DAYS: REAL_START_LEAD_DAYS,
     parseTerm: parseTerm,
+    switchoverFromRealStart: switchoverFromRealStart,
     pickRelativeSemesters: pickRelativeSemesters
   };
 })();
