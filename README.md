@@ -1,10 +1,11 @@
 # Better Canvas (Rice)
 
 A personal, unpacked Chrome extension with quality-of-life tweaks for
-[canvas.rice.edu](https://canvas.rice.edu). Built for personal use.
+[canvas.rice.edu](https://canvas.rice.edu), plus a name-flashcard study mode on
+the Esther course roster. Built for personal use.
 
 > The freeze-dry / Markdown "save this page" actions that used to live here have
-> moved to a separate, standalone extension. Better Canvas is now Canvas-only.
+> moved to a separate, standalone extension.
 
 ## Features
 
@@ -49,6 +50,23 @@ Double-click a handle to hand that column's width back to Canvas.
 Widths are deliberately session-only: they survive sorting and folder
 navigation (both are client-side re-renders of the same page) but reset on
 the next real page load. Nothing is persisted.
+
+### 4. Name flashcards on the Esther course roster
+On the Esther **Class Roster** page (`esther.rice.edu/selfserve/swkrost.main`),
+a **🃏 Flashcard Mode** button appears next to **Download Roster**. Pressing it
+dims the page and deals a deck of study cards:
+
+- The card **front** shows the student photo.
+- Clicking the card **flips** it to the name and the roster's own name-pronunciation
+  player.
+- **✅ Correct** / **❌ Incorrect** buttons grade the guess, send the card to the
+  back of the deck, and deal the next student.
+
+The deck shows every student once in random order (one "pass"), then reshuffles
+for the next pass, so the whole class is covered each round. A live score
+(correct / incorrect / percent) shows at the top. Keyboard: **Space** flips,
+**C**/**X** grade, **Esc** closes. Nothing is persisted; the score resets when
+the overlay closes.
 
 ## How it works
 
@@ -95,15 +113,28 @@ the next real page load. Nothing is persisted.
   (`.FileDragOverlayContainer`) a horizontal scroller and lifts the table's
   `max-width: 100%` cap so widened columns can overflow gracefully.
 
+- **Roster flashcards** — a content script (`src/flashcards/flashcards.js`, on
+  the Esther `…/swkrost*` roster page only) reads each student from
+  `<table class="reporttable">`, locating the **Photo**, **Name**, and **Name
+  Pronunciation** columns by their header text so a column reorder cannot break
+  it. The launch button is inserted before `input[name="p_download"]`. When a
+  card is dealt, the student's photo `<img>` and the NameCoach `<iframe>` are
+  cloned straight out of the page onto the card, so the real pronunciation play
+  button keeps working without the script reaching into a cross-origin `data:`
+  iframe. The overlay, deck, flip, scoring, and shuffle are all in that one file;
+  its styling is in `src/flashcards/flashcards.css`.
+
 The Canvas features send only same-origin requests to `canvas.rice.edu` using
-your existing session.
+your existing session. The roster flashcards send no network requests at all —
+they only read what the roster page already rendered.
 
 ## Install (load unpacked)
 
 1. Open `chrome://extensions`.
 2. Turn on **Developer mode** (top-right).
 3. Click **Load unpacked** and choose this folder.
-4. Open [canvas.rice.edu](https://canvas.rice.edu) and reload.
+4. Open [canvas.rice.edu](https://canvas.rice.edu) and reload. For the flashcards,
+   open your Esther class roster (`esther.rice.edu/selfserve/swkrost.main`).
 
 After editing any file, return to `chrome://extensions` and click the reload
 icon on the extension card, then reload the Canvas tab.
@@ -124,6 +155,8 @@ src/
   tray/course-tray.css          tray list styling
   files/column-resize.js        drag-resizable Files-page columns
   files/column-resize.css       handle styling + overflow scrolling
+  flashcards/flashcards.js      name-flashcard deck on the Esther roster
+  flashcards/flashcards.css     overlay / card / deck styling
 ```
 
 ## Notes & next steps

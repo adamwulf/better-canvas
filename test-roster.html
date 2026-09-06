@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Test Roster (mock)</title>
+<!-- Load the real extension styles/script so this page previews the feature. -->
+<link rel="stylesheet" href="src/flashcards/flashcards.css">
+<style>
+  body { font-family: Arial, sans-serif; margin: 24px; }
+  table.reporttable { border-collapse: collapse; width: 95%; }
+  table.reporttable td { border: 1px solid #b0c4de; padding: 6px; font-size: 12px; vertical-align: middle; }
+  table.reporttable img { width: 90px; height: 110px; object-fit: cover; display: block; }
+  .reporttable tr:first-child td { background: #b0c4de; font-weight: bold; }
+</style>
+</head>
+<body>
+<h2>ENTR 222 001 — Course Roster (mock for testing)</h2>
+
+<!-- Mirrors the real page's Download Roster form so the button injects next to it. -->
+<div align="center" class="noprint">
+  <form method="post" onsubmit="return false;">
+    <table>
+      <tbody><tr>
+        <td><input type="submit" name="p_download" value="Download Roster"></td>
+      </tr></tbody>
+    </table>
+  </form>
+</div>
+
+<table width="95%" class="reporttable" border="1.5">
+  <tbody>
+    <tr>
+      <td><b>Photo</b></td>
+      <td><b>Name</b></td>
+      <td><b>Personal Pronouns</b></td>
+      <td><b>ID</b></td>
+      <td><b>Name Pronunciation</b></td>
+    </tr>
+  </tbody>
+</table>
+
+<script>
+  // Build mock student rows with valid photos and a working pronunciation player.
+  var STUDENTS = [
+    { name: 'Amara Okafor',   color: '#8e44ad', initials: 'AO', say: 'ah-MAH-rah oh-KAH-for' },
+    { name: 'Diego Fuentes',  color: '#2980b9', initials: 'DF', say: 'dee-EH-go FWEN-tes' },
+    { name: 'Priya Nair',     color: '#16a085', initials: 'PN', say: 'PREE-yah NIGH-r' },
+    { name: 'Kenji Watanabe', color: '#c0392b', initials: 'KW', say: 'KEN-jee wah-tah-NAH-beh' },
+    { name: 'Sofia Rossi',    color: '#d35400', initials: 'SR', say: 'so-FEE-ah ROH-see' },
+    { name: 'Malik Johnson',  color: '#27ae60', initials: 'MJ', say: 'mah-LEEK JON-son' },
+    { name: 'Yara Haddad',    color: '#2c3e50', initials: 'YH', say: 'YAH-rah hah-DAHD' }
+  ];
+
+  function photoDataUri(color, initials) {
+    var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="180" height="220">'
+      + '<rect width="180" height="220" fill="' + color + '"/>'
+      + '<text x="90" y="130" font-size="90" fill="#ffffff" text-anchor="middle"'
+      + ' font-family="Arial">' + initials + '</text></svg>';
+    return 'data:image/svg+xml,' + encodeURIComponent(svg);
+  }
+
+  // A tiny self-contained pronunciation player: a button that speaks the name.
+  function pronSrcDoc(name, say) {
+    var esc = function (s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/'/g,'&#39;'); };
+    return '<!DOCTYPE html><html><head><meta charset="utf-8"><style>'
+      + 'html,body{margin:0;height:100%;display:flex;align-items:center;justify-content:center;'
+      + 'font-family:Arial,sans-serif;background:transparent;}'
+      + 'button{font-size:14px;padding:8px 14px;border-radius:10px;border:none;cursor:pointer;'
+      + 'background:#3a6ea5;color:#fff;}</style></head><body>'
+      + '<button id="p">🔊 Play</button>'
+      + '<script>document.getElementById("p").onclick=function(){'
+      + 'try{var u=new SpeechSynthesisUtterance("' + esc(say) + '");speechSynthesis.cancel();speechSynthesis.speak(u);}catch(e){}'
+      + '};<\/script></body></html>';
+  }
+
+  var tbody = document.querySelector('table.reporttable tbody');
+  STUDENTS.forEach(function (s) {
+    var tr = document.createElement('tr');
+
+    var tdPhoto = document.createElement('td');
+    var img = document.createElement('img');
+    img.src = photoDataUri(s.color, s.initials);
+    tdPhoto.appendChild(img);
+
+    var tdName = document.createElement('td');
+    tdName.setAttribute('width', '200');
+    tdName.innerHTML = '<a href="mailto:test@rice.edu"><font size="2">' + s.name + '</font></a>';
+
+    var tdPron_pronouns = document.createElement('td');
+    tdPron_pronouns.innerHTML = '<font size="2"></font>';
+
+    var tdId = document.createElement('td');
+    tdId.innerHTML = '<font size="2">S0100000</font>';
+
+    var tdPron = document.createElement('td');
+    var frame = document.createElement('iframe');
+    frame.setAttribute('width', '100');
+    frame.setAttribute('height', '40');
+    frame.srcdoc = pronSrcDoc(s.name, s.say);
+    tdPron.appendChild(frame);
+
+    tr.appendChild(tdPhoto);
+    tr.appendChild(tdName);
+    tr.appendChild(tdPron_pronouns);
+    tr.appendChild(tdId);
+    tr.appendChild(tdPron);
+    tbody.appendChild(tr);
+  });
+</script>
+
+<!-- The extension content script; on the live page the manifest injects this. -->
+<script src="src/flashcards/flashcards.js"></script>
+</body>
+</html>
