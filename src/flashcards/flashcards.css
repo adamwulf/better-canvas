@@ -186,6 +186,20 @@
   background: linear-gradient(165deg, #182142, #0f1424);
 }
 .bc-fc-name { font-size: 30px; font-weight: 700; line-height: 1.25; }
+/* Turn the card back to the photo, above the pronunciation player. */
+.bc-fc-flip-back {
+  appearance: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 999px;
+  color: #dfe6f5;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  transition: background .15s ease;
+}
+.bc-fc-flip-back:hover { background: rgba(255, 255, 255, 0.16); }
 .bc-fc-pron-label {
   font-size: 13px;
   text-transform: uppercase;
@@ -226,4 +240,3 @@
 .bc-fc-grade:active { transform: translateY(1px); }
 .bc-fc-correct { background: linear-gradient(160deg, #28a866, #1f8f54); }
 .bc-fc-incorrect { background: linear-gradient(160deg, #e05663, #c53b48); }
-.bc-fc-hint-text { font-size: 15px; color: #aab3c9; }
