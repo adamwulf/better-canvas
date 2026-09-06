@@ -199,6 +199,10 @@
     var nextMeta = null;
 
     var flipped = false;
+    // True once the active card has been turned to its name at least once. The
+    // grade buttons then stay on show, so you can flip back to the photo and
+    // forth to the name to memorise, and still grade from either face.
+    var revealed = false;
     var busy = false; // True while a card hand-off animation runs.
 
     // Build one card (front photo, back name + pronunciation) for a dealt meta.
@@ -215,6 +219,7 @@
         + '  </div>'
         + '  <div class="bc-fc-face bc-fc-back">'
         + '    <div class="bc-fc-name"></div>'
+        + '    <button type="button" class="bc-fc-flip-back">↩ Show photo</button>'
         + '    <div class="bc-fc-pron">'
         + '      <div class="bc-fc-pron-label">Name pronunciation</div>'
         + '      <div class="bc-fc-pron-slot"></div>'
@@ -253,6 +258,14 @@
         noPron.textContent = "No recording";
         pronSlot.appendChild(noPron);
       }
+
+      // The back-face button flips the card to the photo again. Its click must
+      // not bubble to the card's own flip handler, or the card would flip
+      // straight back to the name.
+      card.querySelector(".bc-fc-flip-back").addEventListener("click", function (e) {
+        e.stopPropagation();
+        flipBack();
+      });
       return card;
     }
 
@@ -264,9 +277,11 @@
       elProg.textContent = "Pass " + activeMeta.pass + " · " + activeMeta.pos + " of " + activeMeta.len;
     }
 
-    // Actions while the card front is up.
+    // Actions while the card front is up. The card face already says "tap the
+    // card to reveal", so the area below it stays empty until the grade buttons
+    // appear; its min-height holds the space so nothing jumps.
     function showFrontActions() {
-      actions.innerHTML = '<div class="bc-fc-hint-text">Tap the card to see the name.</div>';
+      actions.innerHTML = "";
     }
 
     // Actions after the flip: the grade buttons.
@@ -290,13 +305,30 @@
       if (busy || flipped || !activeCard) return;
       flipped = true;
       activeCard.querySelector(".bc-fc-inner").classList.add("flipped");
-      showGradeActions();
+      // Build the grade buttons the first time this card shows its name. They
+      // then stay through later flips, so flipping back to the photo does not
+      // take them away.
+      if (!revealed) {
+        revealed = true;
+        showGradeActions();
+      }
+    }
+
+    // Turn the card back to the photo. The grade buttons stay, so you can flip
+    // between the photo and the name as often as you like; only grading clears
+    // the card.
+    function flipBack() {
+      if (busy || !flipped || !activeCard) return;
+      flipped = false;
+      activeCard.querySelector(".bc-fc-inner").classList.remove("flipped");
     }
 
     // Record the result, toss the graded card off the deck, and promote the
     // card already waiting behind it. A fresh card is then dealt to the back.
     function grade(wasCorrect) {
-      if (busy || !flipped) return;
+      // Grading is allowed from either face once the name has been seen, so you
+      // can flip back to the photo and still grade yourself.
+      if (busy || !revealed) return;
       if (wasCorrect) correct++; else incorrect++;
       busy = true;
 
@@ -309,6 +341,7 @@
       activeCard = nextCard;
       activeMeta = nextMeta;
       flipped = false;
+      revealed = false; // The fresh card starts on its photo, not yet revealed.
       activeCard.addEventListener("click", flip);
       updateScore();
       showFrontActions();
@@ -338,11 +371,15 @@
     function onKey(e) {
       if (e.key === "Escape") { e.preventDefault(); close(); return; }
       if (busy) return;
-      if (!flipped) {
-        if (e.key === " " || e.key === "Enter") { e.preventDefault(); flip(); }
+      // Space/Enter flips the card either way, so you can turn between the photo
+      // and the name as often as you like.
+      if (e.key === " " || e.key === "Enter") {
+        e.preventDefault();
+        if (flipped) flipBack(); else flip();
         return;
       }
-      // The card is flipped: grade with the keyboard.
+      if (!revealed) return;
+      // The name has been seen: grade with the keyboard from either face.
       if (e.key === "ArrowRight" || e.key.toLowerCase() === "c") { e.preventDefault(); grade(true); }
       else if (e.key === "ArrowLeft" || e.key.toLowerCase() === "x") { e.preventDefault(); grade(false); }
     }
