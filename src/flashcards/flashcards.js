@@ -7,7 +7,9 @@
 // and deals a deck of cards:
 //
 //   - The card front shows the student photo.
-//   - Clicking the card flips it to the name and the pronunciation player.
+//   - Clicking the card turns it over: the photo flips to the name, and the
+//     name flips back to the photo. The pronunciation player is the one spot
+//     that does not flip, so its play button still works.
 //   - Green "Correct" / red "Incorrect" buttons grade the guess, send the card
 //     to the back of the deck, and deal the next student.
 //
@@ -219,12 +221,11 @@
         + '  </div>'
         + '  <div class="bc-fc-face bc-fc-back">'
         + '    <div class="bc-fc-name"></div>'
-        + '    <button type="button" class="bc-fc-flip-back">↩ Show photo</button>'
         + '    <div class="bc-fc-pron">'
         + '      <div class="bc-fc-pron-label">Name pronunciation</div>'
         + '      <div class="bc-fc-pron-slot"></div>'
         + '    </div>'
-        + '    <div class="bc-fc-back-hint">Grade yourself below ↓</div>'
+        + '    <div class="bc-fc-back-hint">Tap the card for the photo · grade yourself below ↓</div>'
         + '  </div>'
         + '</div>';
       card._meta = meta;
@@ -259,13 +260,6 @@
         pronSlot.appendChild(noPron);
       }
 
-      // The back-face button flips the card to the photo again. Its click must
-      // not bubble to the card's own flip handler, or the card would flip
-      // straight back to the name.
-      card.querySelector(".bc-fc-flip-back").addEventListener("click", function (e) {
-        e.stopPropagation();
-        flipBack();
-      });
       return card;
     }
 
@@ -323,6 +317,16 @@
       activeCard.querySelector(".bc-fc-inner").classList.remove("flipped");
     }
 
+    // A click anywhere on the card turns it over, exactly as the front does:
+    // the photo flips to the name, and the name flips back to the photo. The
+    // pronunciation area is the one exception — a click there is meant for the
+    // play button, so it must not flip the card away from the name.
+    function onCardClick(e) {
+      if (busy || !activeCard) return;
+      if (e.target.closest(".bc-fc-pron")) return;
+      if (flipped) flipBack(); else flip();
+    }
+
     // Record the result, toss the graded card off the deck, and promote the
     // card already waiting behind it. A fresh card is then dealt to the back.
     function grade(wasCorrect) {
@@ -334,7 +338,7 @@
 
       // Toss the graded card away; it is removed once its animation ends.
       var outgoing = activeCard;
-      outgoing.removeEventListener("click", flip);
+      outgoing.removeEventListener("click", onCardClick);
       outgoing.classList.add("to-back");
 
       // Promote the waiting card. It already shows a photo front, unflipped.
@@ -342,7 +346,7 @@
       activeMeta = nextMeta;
       flipped = false;
       revealed = false; // The fresh card starts on its photo, not yet revealed.
-      activeCard.addEventListener("click", flip);
+      activeCard.addEventListener("click", onCardClick);
       updateScore();
       showFrontActions();
 
@@ -394,7 +398,7 @@
     nextCard = buildCard(nextMeta);
     deck.appendChild(nextCard);   // Laid behind.
     deck.appendChild(activeCard); // On top.
-    activeCard.addEventListener("click", flip);
+    activeCard.addEventListener("click", onCardClick);
     updateScore();
     showFrontActions();
   }
