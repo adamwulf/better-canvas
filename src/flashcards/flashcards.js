@@ -11,6 +11,11 @@
 //   - Green "Correct" / red "Incorrect" buttons grade the guess, send the card
 //     to the back of the deck, and deal the next student.
 //
+// Each student is dealt onto its own card node, and the next card is built and
+// laid behind the active one before you grade. Grading tosses the graded card
+// away to reveal the waiting card, which already shows a photo — so we never
+// rewrite a node in place and you never glimpse the next name during the swap.
+//
 // The deck shows every student once in random order (one "pass"), then it
 // reshuffles for the next pass, so the whole class is covered each time. A live
 // score (correct / incorrect / percent) shows at the top. Nothing is stored;
@@ -36,6 +41,19 @@
   // Collapse whitespace and trim a text value.
   function tidyText(value) {
     return (value || "").replace(/\s+/g, " ").trim();
+  }
+
+  // The roster lists a name as "Last, First" (sometimes "Last, First Middle").
+  // Reorder it to natural "First Last" for the card. The split is on the first
+  // comma only, so a multi-word given name stays with the first name. A name
+  // with no comma, or with an empty half, is returned unchanged.
+  function toFirstLast(name) {
+    var comma = name.indexOf(",");
+    if (comma === -1) return name;
+    var last = tidyText(name.slice(0, comma));
+    var first = tidyText(name.slice(comma + 1));
+    if (!last || !first) return name;
+    return first + " " + last;
   }
 
   // Find the column index whose header text equals wantedLabel (case-folded).
@@ -114,9 +132,28 @@
       return order;
     }
 
-    var order = shuffledOrder();
-    var position = 0; // Index inside "order".
-    var pass = 1;     // How many times we went through the class.
+    // A dealer that yields each student once per pass, then reshuffles for the
+    // next pass. Every dealt card carries its own pass/position so the score
+    // line can describe whichever card is on top.
+    var dealOrder = shuffledOrder();
+    var dealPos = 0; // Next index to deal within dealOrder.
+    var dealPass = 1;
+    function dealNext() {
+      if (dealPos >= dealOrder.length) {
+        dealOrder = shuffledOrder();
+        dealPos = 0;
+        dealPass++;
+      }
+      var meta = {
+        student: students[dealOrder[dealPos]],
+        pass: dealPass,
+        pos: dealPos + 1,
+        len: dealOrder.length
+      };
+      dealPos++;
+      return meta;
+    }
+
     var correct = 0;
     var incorrect = 0;
 
@@ -137,22 +174,6 @@
       + '    <div class="bc-fc-stack s3"></div>'
       + '    <div class="bc-fc-stack s2"></div>'
       + '    <div class="bc-fc-stack s1"></div>'
-      + '    <div class="bc-fc-card">'
-      + '      <div class="bc-fc-inner">'
-      + '        <div class="bc-fc-face bc-fc-front">'
-      + '          <div class="bc-fc-photo-wrap"></div>'
-      + '          <div class="bc-fc-front-hint">Who is this? — tap the card to reveal.</div>'
-      + '        </div>'
-      + '        <div class="bc-fc-face bc-fc-back">'
-      + '          <div class="bc-fc-name"></div>'
-      + '          <div class="bc-fc-pron">'
-      + '            <div class="bc-fc-pron-label">Name pronunciation</div>'
-      + '            <div class="bc-fc-pron-slot"></div>'
-      + '          </div>'
-      + '          <div class="bc-fc-back-hint">Grade yourself below ↓</div>'
-      + '        </div>'
-      + '      </div>'
-      + '    </div>'
       + '  </div>'
       + '  <div class="bc-fc-actions"></div>'
       + '</div>';
@@ -161,33 +182,49 @@
     var previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
-    var card = overlay.querySelector(".bc-fc-card");
-    var inner = overlay.querySelector(".bc-fc-inner");
-    var photoWrap = overlay.querySelector(".bc-fc-photo-wrap");
-    var nameEl = overlay.querySelector(".bc-fc-name");
-    var pronSlot = overlay.querySelector(".bc-fc-pron-slot");
+    var deck = overlay.querySelector(".bc-fc-deck");
     var actions = overlay.querySelector(".bc-fc-actions");
     var elCorrect = overlay.querySelector(".bc-fc-c");
     var elWrong = overlay.querySelector(".bc-fc-w");
     var elPct = overlay.querySelector(".bc-fc-pct");
     var elProg = overlay.querySelector(".bc-fc-prog");
 
+    // The two live cards: the one being studied and the one dealt behind it.
+    // Because they are separate DOM nodes, grading the top card never rewrites
+    // the node the next student shows on — its face is already a photo, so no
+    // name is ever glimpsed during the hand-off.
+    var activeCard = null;
+    var activeMeta = null;
+    var nextCard = null;
+    var nextMeta = null;
+
     var flipped = false;
-    var busy = false; // True while a card-change animation runs.
+    var busy = false; // True while a card hand-off animation runs.
 
-    function updateScore() {
-      elCorrect.textContent = correct;
-      elWrong.textContent = incorrect;
-      var total = correct + incorrect;
-      elPct.textContent = total ? Math.round((correct / total) * 100) + "%" : "—";
-      elProg.textContent = "Pass " + pass + " · " + (position + 1) + " of " + order.length;
-    }
+    // Build one card (front photo, back name + pronunciation) for a dealt meta.
+    // The card starts on its front; it keeps its meta for the score line.
+    function buildCard(meta) {
+      var student = meta.student;
+      var card = document.createElement("div");
+      card.className = "bc-fc-card";
+      card.innerHTML = ""
+        + '<div class="bc-fc-inner">'
+        + '  <div class="bc-fc-face bc-fc-front">'
+        + '    <div class="bc-fc-photo-wrap"></div>'
+        + '    <div class="bc-fc-front-hint">Who is this? — tap the card to reveal.</div>'
+        + '  </div>'
+        + '  <div class="bc-fc-face bc-fc-back">'
+        + '    <div class="bc-fc-name"></div>'
+        + '    <div class="bc-fc-pron">'
+        + '      <div class="bc-fc-pron-label">Name pronunciation</div>'
+        + '      <div class="bc-fc-pron-slot"></div>'
+        + '    </div>'
+        + '    <div class="bc-fc-back-hint">Grade yourself below ↓</div>'
+        + '  </div>'
+        + '</div>';
+      card._meta = meta;
 
-    // Put the current student on the card front and back.
-    function renderCurrent() {
-      var student = students[order[position]];
-
-      photoWrap.textContent = "";
+      var photoWrap = card.querySelector(".bc-fc-photo-wrap");
       if (student.photo) {
         var img = student.photo.cloneNode(true);
         img.removeAttribute("width");
@@ -200,8 +237,9 @@
         photoWrap.appendChild(none);
       }
 
-      nameEl.textContent = student.name;
-      pronSlot.textContent = "";
+      card.querySelector(".bc-fc-name").textContent = toFirstLast(student.name);
+
+      var pronSlot = card.querySelector(".bc-fc-pron-slot");
       if (student.pron) {
         var frame = student.pron.cloneNode(true);
         frame.className = "bc-fc-pron-frame";
@@ -215,9 +253,15 @@
         noPron.textContent = "No recording";
         pronSlot.appendChild(noPron);
       }
+      return card;
+    }
 
-      updateScore();
-      showFrontActions();
+    function updateScore() {
+      elCorrect.textContent = correct;
+      elWrong.textContent = incorrect;
+      var total = correct + incorrect;
+      elPct.textContent = total ? Math.round((correct / total) * 100) + "%" : "—";
+      elProg.textContent = "Pass " + activeMeta.pass + " · " + activeMeta.pos + " of " + activeMeta.len;
     }
 
     // Actions while the card front is up.
@@ -243,38 +287,44 @@
     }
 
     function flip() {
-      if (busy || flipped) return;
+      if (busy || flipped || !activeCard) return;
       flipped = true;
-      inner.classList.add("flipped");
+      activeCard.querySelector(".bc-fc-inner").classList.add("flipped");
       showGradeActions();
     }
 
-    // Record the result and deal the next random student.
+    // Record the result, toss the graded card off the deck, and promote the
+    // card already waiting behind it. A fresh card is then dealt to the back.
     function grade(wasCorrect) {
-      if (busy) return;
+      if (busy || !flipped) return;
       if (wasCorrect) correct++; else incorrect++;
       busy = true;
 
-      // Send the current card to the back of the deck.
-      card.classList.add("to-back");
+      // Toss the graded card away; it is removed once its animation ends.
+      var outgoing = activeCard;
+      outgoing.removeEventListener("click", flip);
+      outgoing.classList.add("to-back");
+
+      // Promote the waiting card. It already shows a photo front, unflipped.
+      activeCard = nextCard;
+      activeMeta = nextMeta;
+      flipped = false;
+      activeCard.addEventListener("click", flip);
+      updateScore();
+      showFrontActions();
+
+      // Rise it gently into place as the graded card is tossed away.
+      activeCard.classList.add("rise");
+      void activeCard.offsetWidth; // Force reflow so the rise animates.
+      activeCard.classList.remove("rise");
+
+      // Deal the following student onto a new card laid behind the active one.
+      nextMeta = dealNext();
+      nextCard = buildCard(nextMeta);
+      deck.insertBefore(nextCard, activeCard);
 
       window.setTimeout(function () {
-        // Step forward. Reshuffle for a new pass at the end.
-        position++;
-        if (position >= order.length) {
-          order = shuffledOrder();
-          position = 0;
-          pass++;
-        }
-        flipped = false;
-        inner.classList.remove("flipped");
-        renderCurrent();
-
-        // Bring the next card forward from the deck.
-        card.classList.remove("to-back");
-        card.classList.add("from-back");
-        void card.offsetWidth; // Force reflow so the intro animation runs.
-        card.classList.remove("from-back");
+        outgoing.remove();
         busy = false;
       }, 340);
     }
@@ -297,11 +347,19 @@
       else if (e.key === "ArrowLeft" || e.key.toLowerCase() === "x") { e.preventDefault(); grade(false); }
     }
 
-    card.addEventListener("click", flip);
     overlay.querySelector(".bc-fc-close").addEventListener("click", close);
     document.addEventListener("keydown", onKey, true);
 
-    renderCurrent();
+    // Deal the opening hand: the active card on top, the next card behind it.
+    activeMeta = dealNext();
+    activeCard = buildCard(activeMeta);
+    nextMeta = dealNext();
+    nextCard = buildCard(nextMeta);
+    deck.appendChild(nextCard);   // Laid behind.
+    deck.appendChild(activeCard); // On top.
+    activeCard.addEventListener("click", flip);
+    updateScore();
+    showFrontActions();
   }
 
   /* ------------------------------------------------------------------- */

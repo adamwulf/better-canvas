@@ -120,7 +120,8 @@
   transition: transform .34s ease, opacity .34s ease;
 }
 .bc-fc-card.to-back { transform: translateY(28px) scale(.86); opacity: 0; }
-.bc-fc-card.from-back { transform: translateY(-26px) scale(.9); opacity: 0; }
+/* The waiting card rises into place as the graded card is tossed away. */
+.bc-fc-card.rise { transform: translateY(12px) scale(.95); opacity: .85; }
 .bc-fc-inner {
   position: relative;
   width: 100%;
