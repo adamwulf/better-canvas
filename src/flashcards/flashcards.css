@@ -186,7 +186,7 @@
   background: linear-gradient(165deg, #182142, #0f1424);
 }
 .bc-fc-name { font-size: 30px; font-weight: 700; line-height: 1.25; }
-/* Turn the card back to the photo, above the pronunciation player. */
+/* Turn the card back to the photo, at the top above the name. */
 .bc-fc-flip-back {
   appearance: none;
   cursor: pointer;
