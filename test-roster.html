@@ -41,14 +41,16 @@
 
 <script>
   // Build mock student rows with valid photos and a working pronunciation player.
+  // Names use the real Esther "Last, First" order so the card's First-Last
+  // reorder is exercised (a middle name is included to test the split).
   var STUDENTS = [
-    { name: 'Amara Okafor',   color: '#8e44ad', initials: 'AO', say: 'ah-MAH-rah oh-KAH-for' },
-    { name: 'Diego Fuentes',  color: '#2980b9', initials: 'DF', say: 'dee-EH-go FWEN-tes' },
-    { name: 'Priya Nair',     color: '#16a085', initials: 'PN', say: 'PREE-yah NIGH-r' },
-    { name: 'Kenji Watanabe', color: '#c0392b', initials: 'KW', say: 'KEN-jee wah-tah-NAH-beh' },
-    { name: 'Sofia Rossi',    color: '#d35400', initials: 'SR', say: 'so-FEE-ah ROH-see' },
-    { name: 'Malik Johnson',  color: '#27ae60', initials: 'MJ', say: 'mah-LEEK JON-son' },
-    { name: 'Yara Haddad',    color: '#2c3e50', initials: 'YH', say: 'YAH-rah hah-DAHD' }
+    { name: 'Okafor, Amara',        color: '#8e44ad', initials: 'AO', say: 'ah-MAH-rah oh-KAH-for' },
+    { name: 'Fuentes, Diego',       color: '#2980b9', initials: 'DF', say: 'dee-EH-go FWEN-tes' },
+    { name: 'Nair, Priya',          color: '#16a085', initials: 'PN', say: 'PREE-yah NIGH-r' },
+    { name: 'Watanabe, Kenji Taro', color: '#c0392b', initials: 'KW', say: 'KEN-jee wah-tah-NAH-beh' },
+    { name: 'Rossi, Sofia',         color: '#d35400', initials: 'SR', say: 'so-FEE-ah ROH-see' },
+    { name: 'Johnson, Malik',       color: '#27ae60', initials: 'MJ', say: 'mah-LEEK JON-son' },
+    { name: 'Haddad, Yara',         color: '#2c3e50', initials: 'YH', say: 'YAH-rah hah-DAHD' }
   ];
 
   function photoDataUri(color, initials) {
