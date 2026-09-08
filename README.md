@@ -1,8 +1,8 @@
 # Better Canvas (Rice)
 
 A personal, unpacked Chrome extension with quality-of-life tweaks for
-[canvas.rice.edu](https://canvas.rice.edu), plus a name-flashcard study mode on
-the Esther course roster. Built for personal use.
+[canvas.rice.edu](https://canvas.rice.edu), plus study and photo-download tools
+on the Esther course roster. Built for personal use.
 
 > The freeze-dry / Markdown "save this page" actions that used to live here have
 > moved to a separate, standalone extension.
@@ -68,6 +68,18 @@ for the next pass, so the whole class is covered each round. A live score
 **C**/**X** grade, **Esc** closes. Nothing is persisted; the score resets when
 the overlay closes.
 
+### 5. Download student face photos
+
+On the same Esther **Class Roster** page, **⬇ Download Face Photos** collects
+every available roster photo into one `face-photos.zip` download. Each image is
+converted to PNG and named in natural order, such as `First Last.png`.
+Duplicate names receive a numeric suffix instead of overwriting one another.
+
+The conversion and ZIP creation happen entirely in the browser. Photos are
+fetched only from their existing roster URLs using the active Esther session;
+nothing is uploaded to a service or sent to a third party. Students without a
+photo and any failed downloads are reported after the remaining photos finish.
+
 ## How it works
 
 - **Favicon** — a content script (`src/favicon/favicon.js`, `document_start`)
@@ -113,28 +125,33 @@ the overlay closes.
   (`.FileDragOverlayContainer`) a horizontal scroller and lifts the table's
   `max-width: 100%` cap so widened columns can overflow gracefully.
 
-- **Roster flashcards** — a content script (`src/flashcards/flashcards.js`, on
+- **Roster tools** — a content script (`src/flashcards/flashcards.js`, on
   the Esther `…/swkrost*` roster page only) reads each student from
   `<table class="reporttable">`, locating the **Photo**, **Name**, and **Name
   Pronunciation** columns by their header text so a column reorder cannot break
-  it. The launch button is inserted before `input[name="p_download"]`. When a
-  card is dealt, the student's photo `<img>` and the NameCoach `<iframe>` are
+  it. Both roster-tool buttons are inserted before `input[name="p_download"]`.
+  When a card is dealt, the student's photo `<img>` and the NameCoach `<iframe>` are
   cloned straight out of the page onto the card, so the real pronunciation play
   button keeps working without the script reaching into a cross-origin `data:`
-  iframe. The overlay, deck, flip, scoring, and shuffle are all in that one file;
-  its styling is in `src/flashcards/flashcards.css`.
+  iframe. For a photo download, the script fetches the roster image with the
+  existing Esther session, converts it to PNG on a browser canvas, and writes a
+  standards-compliant ZIP locally. The overlay, deck, flip, scoring, download,
+  and ZIP logic are all in that one file; its styling is in
+  `src/flashcards/flashcards.css`.
 
 The Canvas features send only same-origin requests to `canvas.rice.edu` using
-your existing session. The roster flashcards send no network requests at all —
-they only read what the roster page already rendered.
+your existing session. The roster flashcards send no network requests at all;
+the face-photo downloader requests only the image URLs already present on the
+Esther roster, using your existing session. No feature contacts a third-party
+service.
 
 ## Install (load unpacked)
 
 1. Open `chrome://extensions`.
 2. Turn on **Developer mode** (top-right).
 3. Click **Load unpacked** and choose this folder.
-4. Open [canvas.rice.edu](https://canvas.rice.edu) and reload. For the flashcards,
-   open your Esther class roster (`esther.rice.edu/selfserve/swkrost.main`).
+4. Open [canvas.rice.edu](https://canvas.rice.edu) and reload. For the roster
+   tools, open your Esther class roster (`esther.rice.edu/selfserve/swkrost.main`).
 
 After editing any file, return to `chrome://extensions` and click the reload
 icon on the extension card, then reload the Canvas tab.
@@ -155,8 +172,10 @@ src/
   tray/course-tray.css          tray list styling
   files/column-resize.js        drag-resizable Files-page columns
   files/column-resize.css       handle styling + overflow scrolling
-  flashcards/flashcards.js      name-flashcard deck on the Esther roster
-  flashcards/flashcards.css     overlay / card / deck styling
+  flashcards/flashcards.js      flashcards + local face-photo ZIP download
+  flashcards/flashcards.css     roster buttons + card/deck styling
+tests/
+  face-photo-download.test.js   filename and ZIP-format tests
 ```
 
 ## Notes & next steps

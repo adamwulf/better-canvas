@@ -3,8 +3,8 @@
 // The roster page (esther.rice.edu/selfserve/swkrost.main) lists every student
 // as a row in <table class="reporttable">, with a photo, a name, and a
 // NameCoach pronunciation <iframe> among the columns. This script adds a
-// "Flashcard Mode" button next to "Download Roster". Pressing it dims the page
-// and deals a deck of cards:
+// "Flashcard Mode" and "Download Face Photos" buttons next to "Download
+// Roster". Flashcard Mode dims the page and deals a deck of cards:
 //
 //   - The card front shows the student photo.
 //   - Clicking the card turns it over: the photo flips to the name, and the
@@ -22,6 +22,11 @@
 // reshuffles for the next pass, so the whole class is covered each time. A live
 // score (correct / incorrect / percent) shows at the top. Nothing is stored;
 // the score dies with the overlay.
+//
+// Download Face Photos converts every available roster image to PNG in the
+// browser and puts the results in one ZIP, named in natural "First Last"
+// order. The ZIP implementation lives in this file: photos never go through a
+// third-party service.
 //
 // Columns are located by their header text ("Photo", "Name", "Name
 // Pronunciation"), not by fixed position, so the parser survives a column
@@ -120,7 +125,261 @@
   }
 
   /* ------------------------------------------------------------------- */
-  /* 2. The flashcard game.                                              */
+  /* 2. Local PNG and ZIP generation.                                    */
+  /* ------------------------------------------------------------------- */
+
+  // ZIP files use CRC-32 to verify each entry. Build the lookup table once,
+  // then reuse it for every photo in the archive.
+  var crcTable = null;
+  function crc32(bytes) {
+    if (!crcTable) {
+      crcTable = [];
+      for (var n = 0; n < 256; n++) {
+        var value = n;
+        for (var k = 0; k < 8; k++) {
+          value = (value & 1) ? (0xedb88320 ^ (value >>> 1)) : (value >>> 1);
+        }
+        crcTable[n] = value >>> 0;
+      }
+    }
+
+    var crc = 0xffffffff;
+    for (var i = 0; i < bytes.length; i++) {
+      crc = crcTable[(crc ^ bytes[i]) & 0xff] ^ (crc >>> 8);
+    }
+    return (crc ^ 0xffffffff) >>> 0;
+  }
+
+  function writeUint16(target, offset, value) {
+    target[offset] = value & 0xff;
+    target[offset + 1] = (value >>> 8) & 0xff;
+  }
+
+  function writeUint32(target, offset, value) {
+    target[offset] = value & 0xff;
+    target[offset + 1] = (value >>> 8) & 0xff;
+    target[offset + 2] = (value >>> 16) & 0xff;
+    target[offset + 3] = (value >>> 24) & 0xff;
+  }
+
+  function copyBytes(target, offset, bytes) {
+    target.set(bytes, offset);
+    return offset + bytes.length;
+  }
+
+  function zipDateTime(now) {
+    var year = Math.max(1980, now.getFullYear());
+    return {
+      time: (now.getHours() << 11) | (now.getMinutes() << 5) | Math.floor(now.getSeconds() / 2),
+      date: ((year - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate()
+    };
+  }
+
+  // Create a standards-compliant ZIP using uncompressed ("stored") entries.
+  // Photos are already compressed PNG data, so another compression pass would
+  // save little while making the content script substantially larger.
+  function makeZip(files) {
+    var encoder = new TextEncoder();
+    var stamp = zipDateTime(new Date());
+    var entries = files.map(function (file) {
+      var nameBytes = encoder.encode(file.name);
+      return {
+        data: file.data,
+        nameBytes: nameBytes,
+        crc: crc32(file.data),
+        offset: 0
+      };
+    });
+
+    var localSize = entries.reduce(function (total, entry) {
+      return total + 30 + entry.nameBytes.length + entry.data.length;
+    }, 0);
+    var centralSize = entries.reduce(function (total, entry) {
+      return total + 46 + entry.nameBytes.length;
+    }, 0);
+    var output = new Uint8Array(localSize + centralSize + 22);
+    var offset = 0;
+
+    entries.forEach(function (entry) {
+      entry.offset = offset;
+      writeUint32(output, offset, 0x04034b50); // Local file header.
+      writeUint16(output, offset + 4, 20);      // ZIP 2.0.
+      writeUint16(output, offset + 6, 0x0800);  // UTF-8 filename.
+      writeUint16(output, offset + 8, 0);       // Stored, not compressed.
+      writeUint16(output, offset + 10, stamp.time);
+      writeUint16(output, offset + 12, stamp.date);
+      writeUint32(output, offset + 14, entry.crc);
+      writeUint32(output, offset + 18, entry.data.length);
+      writeUint32(output, offset + 22, entry.data.length);
+      writeUint16(output, offset + 26, entry.nameBytes.length);
+      writeUint16(output, offset + 28, 0);
+      offset = copyBytes(output, offset + 30, entry.nameBytes);
+      offset = copyBytes(output, offset, entry.data);
+    });
+
+    var centralOffset = offset;
+    entries.forEach(function (entry) {
+      writeUint32(output, offset, 0x02014b50); // Central directory header.
+      writeUint16(output, offset + 4, 20);
+      writeUint16(output, offset + 6, 20);
+      writeUint16(output, offset + 8, 0x0800);
+      writeUint16(output, offset + 10, 0);
+      writeUint16(output, offset + 12, stamp.time);
+      writeUint16(output, offset + 14, stamp.date);
+      writeUint32(output, offset + 16, entry.crc);
+      writeUint32(output, offset + 20, entry.data.length);
+      writeUint32(output, offset + 24, entry.data.length);
+      writeUint16(output, offset + 28, entry.nameBytes.length);
+      writeUint16(output, offset + 30, 0);
+      writeUint16(output, offset + 32, 0);
+      writeUint16(output, offset + 34, 0);
+      writeUint16(output, offset + 36, 0);
+      writeUint32(output, offset + 38, 0);
+      writeUint32(output, offset + 42, entry.offset);
+      offset = copyBytes(output, offset + 46, entry.nameBytes);
+    });
+
+    writeUint32(output, offset, 0x06054b50); // End of central directory.
+    writeUint16(output, offset + 4, 0);
+    writeUint16(output, offset + 6, 0);
+    writeUint16(output, offset + 8, entries.length);
+    writeUint16(output, offset + 10, entries.length);
+    writeUint32(output, offset + 12, centralSize);
+    writeUint32(output, offset + 16, centralOffset);
+    writeUint16(output, offset + 20, 0);
+    return output;
+  }
+
+  function safeFilename(name) {
+    var filename = toFirstLast(name)
+      .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_")
+      .replace(/[. ]+$/g, "")
+      .trim();
+    if (!filename) filename = "Student";
+    if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i.test(filename)) {
+      filename = "_" + filename;
+    }
+    return filename.slice(0, 180);
+  }
+
+  function uniquePhotoName(studentName, usedNames) {
+    var base = safeFilename(studentName);
+    var candidate = base + ".png";
+    var suffix = 2;
+    while (usedNames[candidate.toLowerCase()]) {
+      candidate = base + " (" + suffix + ").png";
+      suffix++;
+    }
+    usedNames[candidate.toLowerCase()] = true;
+    return candidate;
+  }
+
+  function canvasPngBlob(canvas) {
+    return new Promise(function (resolve, reject) {
+      canvas.toBlob(function (blob) {
+        if (blob) resolve(blob);
+        else reject(new Error("The browser could not encode the photo as PNG."));
+      }, "image/png");
+    });
+  }
+
+  async function photoAsPng(photo) {
+    var url = photo.currentSrc || photo.src || photo.getAttribute("src");
+    if (!url) throw new Error("The photo has no source URL.");
+
+    var response = await fetch(url, { credentials: "include", cache: "force-cache" });
+    if (!response.ok) throw new Error("Photo request returned HTTP " + response.status + ".");
+    var sourceBlob = await response.blob();
+    var bitmap = await createImageBitmap(sourceBlob);
+    try {
+      if (!bitmap.width || !bitmap.height) throw new Error("The photo has no image data.");
+      var canvas = document.createElement("canvas");
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      var context = canvas.getContext("2d");
+      if (!context) throw new Error("The browser could not create an image canvas.");
+      context.drawImage(bitmap, 0, 0);
+      var pngBlob = await canvasPngBlob(canvas);
+      return new Uint8Array(await pngBlob.arrayBuffer());
+    } finally {
+      if (bitmap.close) bitmap.close();
+    }
+  }
+
+  function saveBlob(blob, filename) {
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.style.display = "none";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(function () { URL.revokeObjectURL(url); }, 30000);
+  }
+
+  async function downloadFacePhotos(button) {
+    var students = readStudents();
+    var withPhotos = students.filter(function (student) { return student.photo; });
+    if (!withPhotos.length) {
+      window.alert("Face photos: no student photos were found on this page.");
+      return;
+    }
+
+    var originalLabel = button.textContent;
+    var files = [];
+    var failures = [];
+    var usedNames = Object.create(null);
+    button.disabled = true;
+
+    try {
+      for (var i = 0; i < withPhotos.length; i++) {
+        var student = withPhotos[i];
+        button.textContent = "Preparing " + (i + 1) + "/" + withPhotos.length + "…";
+        try {
+          files.push({
+            name: uniquePhotoName(student.name, usedNames),
+            data: await photoAsPng(student.photo)
+          });
+        } catch (error) {
+          failures.push(toFirstLast(student.name));
+          console.warn("Better Canvas could not download the photo for " + student.name, error);
+        }
+      }
+
+      if (!files.length) {
+        window.alert("Face photos: none of the photos could be downloaded. See the browser console for details.");
+        return;
+      }
+
+      button.textContent = "Building ZIP…";
+      var zip = makeZip(files);
+      saveBlob(new Blob([zip], { type: "application/zip" }), "face-photos.zip");
+
+      var studentsWithoutPhotos = students.length - withPhotos.length;
+      if (failures.length || studentsWithoutPhotos) {
+        var details = [];
+        if (failures.length) details.push(failures.length + " photo download(s) failed");
+        if (studentsWithoutPhotos) details.push(studentsWithoutPhotos + " student(s) had no photo");
+        window.alert("Downloaded " + files.length + " photo(s). " + details.join("; ") + ".");
+      }
+    } finally {
+      button.disabled = false;
+      button.textContent = originalLabel;
+    }
+  }
+
+  // Opt-in hooks for the dependency-free Node tests. No test surface is
+  // created in normal browser use.
+  if (window.__bcTestHooks) {
+    window.__bcTestHooks.toFirstLast = toFirstLast;
+    window.__bcTestHooks.safeFilename = safeFilename;
+    window.__bcTestHooks.uniquePhotoName = uniquePhotoName;
+    window.__bcTestHooks.makeZip = makeZip;
+  }
+
+  /* ------------------------------------------------------------------- */
+  /* 3. The flashcard game.                                              */
   /* ------------------------------------------------------------------- */
 
   function startGame(students) {
@@ -404,7 +663,7 @@
   }
 
   /* ------------------------------------------------------------------- */
-  /* 3. Add the launch button to the page.                               */
+  /* 4. Add the roster buttons to the page.                              */
   /* ------------------------------------------------------------------- */
 
   function launch() {
@@ -416,34 +675,57 @@
     startGame(students);
   }
 
-  function addLaunchButton() {
-    if (document.querySelector(".bc-fc-launch")) return;
-
-    var button = document.createElement("button");
-    button.type = "button";
-    button.className = "bc-fc-launch";
-    button.textContent = "🃏 Flashcard Mode";
-    button.addEventListener("click", launch);
-
-    // Place the button just to the left of "Download Roster".
+  function addRosterButtons() {
     var download = document.querySelector('input[name="p_download"]');
-    if (download && download.parentNode) {
-      download.parentNode.insertBefore(button, download);
-      return;
+    var parent = download && download.parentNode;
+
+    if (!document.querySelector(".bc-fc-launch")) {
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "bc-roster-action bc-fc-launch";
+      button.textContent = "🃏 Flashcard Mode";
+      button.addEventListener("click", launch);
+
+      if (parent) {
+        parent.insertBefore(button, download);
+      } else {
+        // Fallback: float the button at the top-right of the page.
+        button.style.position = "fixed";
+        button.style.top = "12px";
+        button.style.right = "12px";
+        button.style.zIndex = "2147483000";
+        document.body.appendChild(button);
+      }
     }
 
-    // Fallback: float the button at the top-right of the page.
-    button.style.position = "fixed";
-    button.style.top = "12px";
-    button.style.right = "12px";
-    button.style.zIndex = "2147483000";
-    document.body.appendChild(button);
+    if (!document.querySelector(".bc-photo-download")) {
+      var photoButton = document.createElement("button");
+      photoButton.type = "button";
+      photoButton.className = "bc-roster-action bc-photo-download";
+      photoButton.textContent = "⬇ Download Face Photos";
+      photoButton.addEventListener("click", function () {
+        downloadFacePhotos(photoButton).catch(function (error) {
+          console.error("Better Canvas could not build the face photo ZIP.", error);
+          window.alert("Face photos: the ZIP could not be created. See the browser console for details.");
+        });
+      });
+
+      if (parent) {
+        parent.insertBefore(photoButton, download);
+      } else {
+        photoButton.style.position = "fixed";
+        photoButton.style.top = "52px";
+        photoButton.style.right = "12px";
+        photoButton.style.zIndex = "2147483000";
+        document.body.appendChild(photoButton);
+      }
+    }
   }
 
   // Only run where the roster is actually present.
   function init() {
     if (document.querySelector("table.reporttable")) {
-      addLaunchButton();
+      addRosterButtons();
     }
   }
 

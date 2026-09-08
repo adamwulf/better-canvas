@@ -6,8 +6,8 @@
  * high z-index and dims everything behind it.
  */
 
-/* The launch button that sits next to "Download Roster". */
-.bc-fc-launch {
+/* The roster actions that sit next to "Download Roster". */
+.bc-roster-action {
   appearance: none;
   cursor: pointer;
   font-size: 13px;
@@ -20,7 +20,12 @@
   background: linear-gradient(160deg, #3a6ea5, #2b5586);
   vertical-align: middle;
 }
-.bc-fc-launch:hover { filter: brightness(1.08); }
+.bc-roster-action:hover { filter: brightness(1.08); }
+.bc-roster-action:disabled {
+  cursor: wait;
+  filter: none;
+  opacity: .7;
+}
 
 /* The full-screen dimmer that holds the deck. */
 .bc-fc-overlay {
