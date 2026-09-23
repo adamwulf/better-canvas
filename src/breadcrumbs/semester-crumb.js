@@ -13,8 +13,9 @@
 // back to one same-origin API call (GET /api/v1/courses/:id?include[]=term).
 // The label is the season + year from BetterCanvasTerms.parseTerm; a term name
 // with no season + year adds nothing, and neither does a crumb whose course
-// name already contains the label. Pages with no breadcrumb (SpeedGrader,
-// full-screen tools, non-HTML documents) are skipped before any work.
+// name already contains the label. Pages with no breadcrumb link to the course
+// home (SpeedGrader, full-screen tools, non-HTML documents) are skipped before
+// any work.
 //
 // Canvas re-renders the breadcrumb client-side on some pages (Files folder
 // navigation, for example), so a MutationObserver re-applies the label. The
@@ -32,14 +33,13 @@
 
   var MARK = "data-better-canvas-semester";
 
-  // The id may be a cross-shard id such as "1~123", and it must end at a path
-  // boundary so that id never reads as course "1".
+  // The id is a course id, or a cross-shard id such as "1~123". It must end at
+  // a path boundary, so a malformed segment such as "12abc" does not match.
   var idMatch = location.pathname.match(/^\/courses\/(\d+(?:~\d+)?)(?=\/|$)/);
-  if (!idMatch || !document.getElementById("breadcrumbs")) {
+  if (!idMatch) {
     return;
   }
-  var courseId = idMatch[1];
-  var coursePath = "/courses/" + courseId;
+  var coursePath = "/courses/" + idMatch[1];
 
   // ---- Term name ----------------------------------------------------------
 
@@ -108,6 +108,10 @@
   }
 
   // ---- Boot ---------------------------------------------------------------
+
+  if (!findCourseCrumb()) {
+    return; // no breadcrumb link to this course: nothing to label
+  }
 
   loadTermName()
     .then(function (termName) {

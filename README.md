@@ -120,11 +120,11 @@ photo and any failed downloads are reported after the remaining photos finish.
 
 - **Course breadcrumb semester** — a content script
   (`src/breadcrumbs/semester-crumb.js`, on `/courses/*` pages) first skips a
-  page with no breadcrumb (SpeedGrader, for example). Otherwise it reads the
-  term name from the course menu's subtitle (`#section-tabs-header-subtitle`).
-  A course menu with no subtitle means the course has no named term. Only on
-  a page with no course menu does it ask
-  `GET /api/v1/courses/:id?include[]=term` instead. `parseTerm` (in
+  page with no breadcrumb link to the course home (SpeedGrader, for example,
+  has no breadcrumb). Otherwise it reads the term name from the course menu's
+  subtitle (`#section-tabs-header-subtitle`). A course menu with no subtitle
+  means the course has no named term. Only on a page with no course menu does
+  it ask `GET /api/v1/courses/:id?include[]=term` instead. `parseTerm` (in
   `src/lib/terms.js`) turns the name into the season + year label, and the
   script appends that label in its own `<span>` inside the breadcrumb link to
   the course home (`#breadcrumbs a` whose path is `/courses/:id`), unless the
