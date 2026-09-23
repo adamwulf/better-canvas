@@ -42,7 +42,15 @@ In the sidebar tray, Canvas's own "Published Courses" / "Unpublished Courses"
 split is replaced by the same four semester groups; the tray's **All Courses**
 link and footer text are left as-is.
 
-### 3. Resizable columns on Files pages
+### 3. Semester on the course breadcrumb
+On every page inside a course, the course crumb at the top of the page gets
+the course's semester, so `UNIV 285 901 > Assignments` reads
+`UNIV 285 901 (Fall 2026) > Assignments`. The semester is the season + year of
+the course's term (the full term name, such as `Fall Semester 2026 Full Term`,
+is what Canvas shows above the course menu). A course whose term has no season
+and year gets no label.
+
+### 4. Resizable columns on Files pages
 On the course/group/user **Files** pages, every column header gets a thin
 drag handle on its right edge. Drag it to resize the column — most usefully
 to widen **Name** so long file names stop truncating. If the columns outgrow
@@ -53,7 +61,7 @@ Widths are deliberately session-only: they survive sorting and folder
 navigation (both are client-side re-renders of the same page) but reset on
 the next real page load. Nothing is persisted.
 
-### 4. Name flashcards on the Esther course roster
+### 5. Name flashcards on the Esther course roster
 On the Esther **Class Roster** page (`esther.rice.edu/selfserve/swkrost.main`),
 a **🃏 Flashcard Mode** button appears next to **Download Roster**. Pressing it
 dims the page and deals a deck of study cards:
@@ -70,7 +78,7 @@ for the next pass, so the whole class is covered each round. A live score
 **C**/**X** grade, **Esc** closes. Nothing is persisted; the score resets when
 the overlay closes.
 
-### 5. Download student face photos
+### 6. Download student face photos
 
 On the same Esther **Class Roster** page, **⬇ Download Face Photos** collects
 every available roster photo into one `face-photos.zip` download. Each image is
@@ -108,6 +116,16 @@ photo and any failed downloads are reported after the remaining photos finish.
   section wrapper and inserts the semester-grouped list in its place. Course
   colors come from `GET /api/v1/users/self/colors` (fetched lazily, once,
   best-effort).
+
+- **Course breadcrumb semester** — a content script
+  (`src/breadcrumbs/semester-crumb.js`, on `/courses/*` pages) reads the term
+  name from the course menu's subtitle (`#section-tabs-header-subtitle`). On a
+  page with no course menu it asks `GET /api/v1/courses/:id?include[]=term`
+  instead. `parseTerm` turns the name into the season + year label, and the
+  script appends that label in its own `<span>` inside the breadcrumb link to
+  the course home (`#breadcrumbs a` whose path is `/courses/:id`). Canvas
+  re-renders the breadcrumb client-side on some pages (Files folder navigation,
+  for example), so a `MutationObserver` puts the label back when it disappears.
 
 - **Files column resize** — the new Files page renders the file list as a real
   `<table id="files-table">` (Instructure UI) with `table-layout: fixed`, so
@@ -173,6 +191,7 @@ src/
   dashboard/dashboard.css       list styling
   tray/course-tray.js           regroups the "Courses" sidebar tray
   tray/course-tray.css          tray list styling
+  breadcrumbs/semester-crumb.js adds the semester to the course breadcrumb
   files/column-resize.js        drag-resizable Files-page columns
   files/column-resize.css       handle styling + overflow scrolling
   flashcards/flashcards.js      flashcards + local face-photo ZIP download

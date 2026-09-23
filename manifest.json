@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Better Canvas (Rice)",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Personal quality-of-life tweaks for Canvas and the Esther course roster.",
   "icons": {
     "16": "icons/icon16.png",
@@ -35,6 +35,12 @@
       "matches": ["*://canvas.rice.edu/*", "*://hq.globaltech.org/*"],
       "js": ["src/lib/terms.js", "src/lib/grouping.js", "src/tray/course-tray.js"],
       "css": ["src/tray/course-tray.css"],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
+      "matches": ["*://canvas.rice.edu/courses/*", "*://hq.globaltech.org/courses/*"],
+      "js": ["src/lib/terms.js", "src/breadcrumbs/semester-crumb.js"],
       "run_at": "document_idle",
       "all_frames": false
     },
