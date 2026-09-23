@@ -43,8 +43,8 @@ split is replaced by the same four semester groups; the tray's **All Courses**
 link and footer text are left as-is.
 
 ### 3. Semester on the course breadcrumb
-On every page inside a course, the course crumb at the top of the page gets
-the course's semester, so `UNIV 285 901 > Assignments` reads
+On every course page that shows a breadcrumb, the course crumb at the top of
+the page gets the course's semester, so `UNIV 285 901 > Assignments` reads
 `UNIV 285 901 (Fall 2026) > Assignments`. The semester is the season + year of
 the course's term (the full term name, such as `Fall Semester 2026 Full Term`,
 is what Canvas shows above the course menu). A course whose term has no season
@@ -119,15 +119,16 @@ photo and any failed downloads are reported after the remaining photos finish.
   best-effort).
 
 - **Course breadcrumb semester** — a content script
-  (`src/breadcrumbs/semester-crumb.js`, on `/courses/*` pages) reads the term
-  name from the course menu's subtitle (`#section-tabs-header-subtitle`). A
-  course menu with no subtitle means the course has no named term. Only on a
-  page with no course menu does it ask
-  `GET /api/v1/courses/:id?include[]=term` instead, and a page with no
-  breadcrumb is skipped before any of this. `parseTerm` (in
+  (`src/breadcrumbs/semester-crumb.js`, on `/courses/*` pages) first skips a
+  page with no breadcrumb (SpeedGrader, for example). Otherwise it reads the
+  term name from the course menu's subtitle (`#section-tabs-header-subtitle`).
+  A course menu with no subtitle means the course has no named term. Only on
+  a page with no course menu does it ask
+  `GET /api/v1/courses/:id?include[]=term` instead. `parseTerm` (in
   `src/lib/terms.js`) turns the name into the season + year label, and the
   script appends that label in its own `<span>` inside the breadcrumb link to
-  the course home (`#breadcrumbs a` whose path is `/courses/:id`). Canvas
+  the course home (`#breadcrumbs a` whose path is `/courses/:id`), unless the
+  course name already contains the label. Canvas
   re-renders the breadcrumb client-side on some pages (Files folder navigation,
   for example), so a `MutationObserver` puts the label back when it disappears.
 
