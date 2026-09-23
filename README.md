@@ -1,8 +1,10 @@
 # Better Canvas (Rice)
 
 A personal, unpacked Chrome extension with quality-of-life tweaks for
-[canvas.rice.edu](https://canvas.rice.edu), plus study and photo-download tools
-on the Esther course roster. Built for personal use.
+[canvas.rice.edu](https://canvas.rice.edu) and
+[hq.globaltech.org](https://hq.globaltech.org) (a partner org's Canvas site that
+hosts a Rice course), plus study and photo-download tools on the Esther course
+roster. Built for personal use.
 
 > The freeze-dry / Markdown "save this page" actions that used to live here have
 > moved to a separate, standalone extension.
@@ -10,7 +12,7 @@ on the Esther course roster. Built for personal use.
 ## Features
 
 ### 1. Custom tab favicon
-Every `canvas.rice.edu` tab shows the bundled Canvas logo as its favicon, so
+Every Canvas tab (`canvas.rice.edu` or `hq.globaltech.org`) shows the bundled Canvas logo as its favicon, so
 Canvas tabs are easy to pick out. The icon is re-applied if Canvas swaps it back
 during single-page navigation.
 
@@ -139,8 +141,8 @@ photo and any failed downloads are reported after the remaining photos finish.
   and ZIP logic are all in that one file; its styling is in
   `src/flashcards/flashcards.css`.
 
-The Canvas features send only same-origin requests to `canvas.rice.edu` using
-your existing session. The roster flashcards send no network requests at all;
+The Canvas features send only same-origin requests to the Canvas site you are
+on (`canvas.rice.edu` or `hq.globaltech.org`) using your existing session. The roster flashcards send no network requests at all;
 the face-photo downloader requests only the image URLs already present on the
 Esther roster, using your existing session. No feature contacts a third-party
 service.
@@ -150,7 +152,8 @@ service.
 1. Open `chrome://extensions`.
 2. Turn on **Developer mode** (top-right).
 3. Click **Load unpacked** and choose this folder.
-4. Open [canvas.rice.edu](https://canvas.rice.edu) and reload. For the roster
+4. Open [canvas.rice.edu](https://canvas.rice.edu) or
+   [hq.globaltech.org](https://hq.globaltech.org) and reload. For the roster
    tools, open your Esther class roster (`esther.rice.edu/selfserve/swkrost.main`).
 
 After editing any file, return to `chrome://extensions` and click the reload
@@ -180,8 +183,15 @@ tests/
 
 ## Notes & next steps
 
-- Only `canvas.rice.edu` is wired up for the Canvas features. `courses.rice.edu`
-  support is planned but not implemented yet.
+- The Canvas features are wired up for `canvas.rice.edu` and
+  `hq.globaltech.org`. All Canvas API calls use relative paths, so adding
+  another Canvas host only needs new `matches` patterns in `manifest.json`.
+  `courses.rice.edu` support is planned but not implemented yet.
+- Term grouping needs a season and a year in the term name (e.g. `Fall 2026`).
+  A course whose term name has no season + year (or no term at all) always
+  sorts under **Older**, even if Canvas exposes real term dates for it. If
+  another Canvas site names its terms differently, teach `parseTerm` in
+  `src/lib/terms.js` the new format.
 - The "current vs. next" boundary uses an approximate calendar when Canvas does
   not expose real term dates. If a specific semester should land differently,
   the season date ranges are in `src/lib/terms.js` (`SEASONS`).
