@@ -32,9 +32,9 @@
 
   var MARK = "data-better-canvas-semester";
 
-  // The id must end at a path boundary: a cross-shard id such as "1~123"
-  // must not read as course "1".
-  var idMatch = location.pathname.match(/^\/courses\/(\d+)(?=\/|$)/);
+  // The id may be a cross-shard id such as "1~123", and it must end at a path
+  // boundary so that id never reads as course "1".
+  var idMatch = location.pathname.match(/^\/courses\/(\d+(?:~\d+)?)(?=\/|$)/);
   if (!idMatch || !document.getElementById("breadcrumbs")) {
     return;
   }

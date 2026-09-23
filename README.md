@@ -128,9 +128,9 @@ photo and any failed downloads are reported after the remaining photos finish.
   `src/lib/terms.js`) turns the name into the season + year label, and the
   script appends that label in its own `<span>` inside the breadcrumb link to
   the course home (`#breadcrumbs a` whose path is `/courses/:id`), unless the
-  course name already contains the label. Canvas
-  re-renders the breadcrumb client-side on some pages (Files folder navigation,
-  for example), so a `MutationObserver` puts the label back when it disappears.
+  course name already contains the label. Canvas re-renders the breadcrumb
+  client-side on some pages (Files folder navigation, for example), so a
+  `MutationObserver` puts the label back when it disappears.
 
 - **Files column resize** — the new Files page renders the file list as a real
   `<table id="files-table">` (Instructure UI) with `table-layout: fixed`, so
