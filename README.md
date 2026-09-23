@@ -48,7 +48,8 @@ the course's semester, so `UNIV 285 901 > Assignments` reads
 `UNIV 285 901 (Fall 2026) > Assignments`. The semester is the season + year of
 the course's term (the full term name, such as `Fall Semester 2026 Full Term`,
 is what Canvas shows above the course menu). A course whose term has no season
-and year gets no label.
+and year gets no label, and neither does a course whose name already contains
+its semester.
 
 ### 4. Resizable columns on Files pages
 On the course/group/user **Files** pages, every column header gets a thin
@@ -119,9 +120,12 @@ photo and any failed downloads are reported after the remaining photos finish.
 
 - **Course breadcrumb semester** — a content script
   (`src/breadcrumbs/semester-crumb.js`, on `/courses/*` pages) reads the term
-  name from the course menu's subtitle (`#section-tabs-header-subtitle`). On a
-  page with no course menu it asks `GET /api/v1/courses/:id?include[]=term`
-  instead. `parseTerm` turns the name into the season + year label, and the
+  name from the course menu's subtitle (`#section-tabs-header-subtitle`). A
+  course menu with no subtitle means the course has no named term. Only on a
+  page with no course menu does it ask
+  `GET /api/v1/courses/:id?include[]=term` instead, and a page with no
+  breadcrumb is skipped before any of this. `parseTerm` (in
+  `src/lib/terms.js`) turns the name into the season + year label, and the
   script appends that label in its own `<span>` inside the breadcrumb link to
   the course home (`#breadcrumbs a` whose path is `/courses/:id`). Canvas
   re-renders the breadcrumb client-side on some pages (Files folder navigation,
@@ -208,9 +212,9 @@ tests/
   `courses.rice.edu` support is planned but not implemented yet.
 - Term grouping needs a season and a year in the term name (e.g. `Fall 2026`).
   A course whose term name has no season + year (or no term at all) always
-  sorts under **Older**, even if Canvas exposes real term dates for it. If
-  another Canvas site names its terms differently, teach `parseTerm` in
-  `src/lib/terms.js` the new format.
+  sorts under **Older**, even if Canvas exposes real term dates for it, and
+  gets no semester label on its breadcrumb. If another Canvas site names its
+  terms differently, teach `parseTerm` in `src/lib/terms.js` the new format.
 - The "current vs. next" boundary uses an approximate calendar when Canvas does
   not expose real term dates. If a specific semester should land differently,
   the season date ranges are in `src/lib/terms.js` (`SEASONS`).

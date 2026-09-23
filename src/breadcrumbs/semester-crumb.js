@@ -7,11 +7,14 @@
 // This script appends the short semester to the course crumb:
 //   UNIV 285 901 (Fall 2026) > Assignments
 //
-// The term name comes from the sidebar subtitle when Canvas renders it. Pages
-// that render no course menu fall back to one same-origin API call
-// (GET /api/v1/courses/:id?include[]=term). The label is the season + year
-// from BetterCanvasTerms.parseTerm; a term name with no season + year (or a
-// course with no term) adds nothing.
+// The term name comes from the sidebar subtitle when Canvas renders it. A
+// course menu (#section-tabs) with no subtitle means the course has no named
+// term, so nothing is added. Only pages that render no course menu at all fall
+// back to one same-origin API call (GET /api/v1/courses/:id?include[]=term).
+// The label is the season + year from BetterCanvasTerms.parseTerm; a term name
+// with no season + year adds nothing, and neither does a crumb whose course
+// name already contains the label. Pages with no breadcrumb (SpeedGrader,
+// full-screen tools, non-HTML documents) are skipped before any work.
 //
 // Canvas re-renders the breadcrumb client-side on some pages (Files folder
 // navigation, for example), so a MutationObserver re-applies the label. The
@@ -30,18 +33,13 @@
   var MARK = "data-better-canvas-semester";
 
   var idMatch = location.pathname.match(/^\/courses\/(\d+)/);
-  if (!idMatch) {
+  if (!idMatch || !document.getElementById("breadcrumbs")) {
     return;
   }
   var courseId = idMatch[1];
   var coursePath = "/courses/" + courseId;
 
   // ---- Term name ----------------------------------------------------------
-
-  function termNameFromSidebar() {
-    var subtitle = document.getElementById("section-tabs-header-subtitle");
-    return subtitle ? (subtitle.textContent || "").trim() : "";
-  }
 
   function termNameFromApi() {
     var url = "/api/v1" + coursePath + "?include[]=term";
@@ -65,8 +63,14 @@
   }
 
   function loadTermName() {
-    var fromSidebar = termNameFromSidebar();
-    return fromSidebar ? Promise.resolve(fromSidebar) : termNameFromApi();
+    var subtitle = document.getElementById("section-tabs-header-subtitle");
+    if (subtitle) {
+      return Promise.resolve((subtitle.textContent || "").trim());
+    }
+    if (document.getElementById("section-tabs")) {
+      return Promise.resolve(""); // course menu shown, but no named term
+    }
+    return termNameFromApi();
   }
 
   // ---- Breadcrumb ---------------------------------------------------------
@@ -91,20 +95,30 @@
     if (!crumb || crumb.querySelector("[" + MARK + "]")) {
       return;
     }
+    var name = (crumb.textContent || "").toLowerCase();
+    if (name.indexOf(label.toLowerCase()) !== -1) {
+      return; // e.g. "UNIV 285 Fall 2026" already names its semester
+    }
     var span = document.createElement("span");
     span.setAttribute(MARK, "");
     span.textContent = " (" + label + ")";
     crumb.appendChild(span);
   }
 
-  loadTermName().then(function (termName) {
-    var label = Terms.parseTerm(termName).label;
-    if (!label) {
-      return;
-    }
-    apply(label);
-    new MutationObserver(function () {
+  // ---- Boot ---------------------------------------------------------------
+
+  loadTermName()
+    .then(function (termName) {
+      var label = Terms.parseTerm(termName).label;
+      if (!label) {
+        return;
+      }
       apply(label);
-    }).observe(document.body, { childList: true, subtree: true });
-  });
+      new MutationObserver(function () {
+        apply(label);
+      }).observe(document.body, { childList: true, subtree: true });
+    })
+    .catch(function (err) {
+      console.warn("[BetterCanvas] semester crumb failed", err);
+    });
 })();
