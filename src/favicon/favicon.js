@@ -1,7 +1,7 @@
 // Better Canvas (Rice) — favicon swap
 //
-// Replaces the browser-tab favicon on every canvas.rice.edu page with the
-// bundled Canvas logo. Canvas can rewrite the favicon at runtime (for unread
+// Replaces the browser-tab favicon on every Canvas page (canvas.rice.edu and
+// hq.globaltech.org) with the bundled Canvas logo. Canvas can rewrite the favicon at runtime (for unread
 // badges, SPA navigation, etc.), so a MutationObserver re-applies our icon
 // whenever the <head> changes.
 

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Better Canvas (Rice)",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Personal quality-of-life tweaks for Canvas and the Esther course roster.",
   "icons": {
     "16": "icons/icon16.png",
@@ -10,7 +10,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["*://canvas.rice.edu/*"],
+      "matches": ["*://canvas.rice.edu/*", "*://hq.globaltech.org/*"],
       "js": ["src/favicon/favicon.js"],
       "run_at": "document_start",
       "all_frames": false
@@ -20,7 +20,11 @@
         "*://canvas.rice.edu/",
         "*://canvas.rice.edu/?*",
         "*://canvas.rice.edu/dashboard",
-        "*://canvas.rice.edu/dashboard?*"
+        "*://canvas.rice.edu/dashboard?*",
+        "*://hq.globaltech.org/",
+        "*://hq.globaltech.org/?*",
+        "*://hq.globaltech.org/dashboard",
+        "*://hq.globaltech.org/dashboard?*"
       ],
       "js": ["src/lib/terms.js", "src/lib/grouping.js", "src/dashboard/dashboard.js"],
       "css": ["src/dashboard/dashboard.css"],
@@ -28,7 +32,7 @@
       "all_frames": false
     },
     {
-      "matches": ["*://canvas.rice.edu/*"],
+      "matches": ["*://canvas.rice.edu/*", "*://hq.globaltech.org/*"],
       "js": ["src/lib/terms.js", "src/lib/grouping.js", "src/tray/course-tray.js"],
       "css": ["src/tray/course-tray.css"],
       "run_at": "document_idle",
@@ -39,7 +43,11 @@
         "*://canvas.rice.edu/files*",
         "*://canvas.rice.edu/courses/*/files*",
         "*://canvas.rice.edu/groups/*/files*",
-        "*://canvas.rice.edu/users/*/files*"
+        "*://canvas.rice.edu/users/*/files*",
+        "*://hq.globaltech.org/files*",
+        "*://hq.globaltech.org/courses/*/files*",
+        "*://hq.globaltech.org/groups/*/files*",
+        "*://hq.globaltech.org/users/*/files*"
       ],
       "js": ["src/files/column-resize.js"],
       "css": ["src/files/column-resize.css"],
@@ -61,7 +69,7 @@
         "assets/canvas-favicon-32.png",
         "assets/canvas-favicon-48.png"
       ],
-      "matches": ["*://canvas.rice.edu/*"]
+      "matches": ["*://canvas.rice.edu/*", "*://hq.globaltech.org/*"]
     }
   ]
 }
