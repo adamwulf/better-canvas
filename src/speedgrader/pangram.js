@@ -45,10 +45,14 @@
 // (which keeps that area from content scripts), under the SHA-256 hash of the
 // text from step 3: the submission's joined text before redaction and before
 // any edit in the dialog. Preparing a text with a saved result shows that
-// result and sends nothing. "Check again" (or "Send to Pangram again") always
-// sends a new check, and its result replaces the saved one. A saved result
-// holds Pangram's answer (with the redacted text Pangram scored), the facts
-// shown with it, and the time of the check.
+// result and sends nothing. When a student's section first shows and any
+// result is saved, steps 1-3 run by themselves to look for that student's
+// saved result, so a submission already checked shows its result with no
+// click; with none, the section stays at step 1 and keeps the text for
+// "Prepare text for Pangram". "Check again" (or "Send to Pangram again")
+// always sends a new check, and its result replaces the saved one. A saved
+// result holds Pangram's answer (with the redacted text Pangram scored), the
+// facts shown with it, and the time of the check.
 
 (function () {
   "use strict";
@@ -424,24 +428,13 @@
     renderDialog();
   }
 
-  // Gets the submission text and redacts it. No dialog opens: the section
-  // shows the progress, and then "Details" opens the text for review. With
-  // thenSend the text goes to Pangram as soon as it is ready. A result saved
-  // for the same text is shown instead, unless recheck asks for a new check.
-  function prepare(target, thenSend, recheck) {
-    var state = stateFor(target.key);
-    update(state, { status: "preparing", error: "", needsKey: false, result: null, preview: null, hash: "", checkedAt: 0 });
-    var hasKey, submission, extracted, hash;
-
-    // The key check runs first: it also starts the background worker, which
-    // locks the key away from content scripts before any student file is
-    // parsed here. A missing key stops only a new check, after the saved
-    // result lookup, because showing a saved result needs no key.
-    sendMessage({ type: "pangram-status" })
-      .then(function (status) {
-        hasKey = status.hasKey;
-        return loadSubmission(target);
-      })
+  // { submission, extracted, hash }: the student's submission, its text, and
+  // that text's hash. The caller messages the background worker first, which
+  // starts it, so it locks the key away from content scripts before any
+  // student file is parsed here.
+  function readSubmission(target) {
+    var submission, extracted;
+    return loadSubmission(target)
       .then(function (loaded) {
         submission = loaded;
         return submissionText(submission);
@@ -454,20 +447,96 @@
         extracted = found;
         return textHash(found.text);
       })
-      .then(function (digest) {
-        hash = digest;
-        return recheck ? null : loadSaved(hash);
+      .then(function (hash) {
+        return { submission: submission, extracted: extracted, hash: hash };
+      });
+  }
+
+  function showSavedResult(state, read, saved) {
+    update(state, {
+      status: "done",
+      attempt: read.submission.attempt,
+      hash: read.hash,
+      result: saved.result,
+      preview: saved.preview,
+      checkedAt: saved.checkedAt
+    });
+  }
+
+  // Looks for a saved result when a student's section first shows, so a
+  // submission already checked shows its result with no click. It reads the
+  // text but needs no key or roster, and nothing leaves the browser. It runs
+  // only when some result is saved, and only if the student is still on
+  // screen, so paging through students does not read every submission. With
+  // no saved result, the section goes back to step 1 and keeps the text it
+  // read for "Prepare text for Pangram", which also shows any error.
+  function lookup(target) {
+    var state = stateFor(target.key);
+    state.lookedUp = true;
+    var read;
+    // As in prepare(), this message starts the background worker first.
+    sendMessage({ type: "pangram-status" })
+      .then(function (status) {
+        if (state.status !== "idle") {
+          return null; // the grader clicked a button meanwhile
+        }
+        var current = currentTarget();
+        if (!current || current.key !== target.key) {
+          state.lookedUp = false; // look when the student is back on screen
+          return null;
+        }
+        if (!status.hasResults) {
+          return null;
+        }
+        update(state, { status: "looking" });
+        return readSubmission(target)
+          .then(function (found) {
+            read = found;
+            return loadSaved(read.hash);
+          })
+          .then(function (saved) {
+            if (saved) {
+              showSavedResult(state, read, saved);
+            } else {
+              update(state, { status: "idle", read: read });
+            }
+          });
+      })
+      .catch(function () {
+        if (state.status === "looking") {
+          update(state, { status: "idle" });
+        }
+      });
+  }
+
+  // Gets the submission text and redacts it. No dialog opens: the section
+  // shows the progress, and then "Details" opens the text for review. With
+  // thenSend the text goes to Pangram as soon as it is ready. A result saved
+  // for the same text is shown instead, unless recheck asks for a new check.
+  // Text the lookup already read is used again, except by a recheck, which
+  // reads the submission again.
+  function prepare(target, thenSend, recheck) {
+    var state = stateFor(target.key);
+    var alreadyRead = recheck ? null : state.read;
+    update(state, { status: "preparing", error: "", needsKey: false, result: null, preview: null, hash: "", checkedAt: 0, read: null });
+    var hasKey, read;
+
+    // The key check runs first: it also starts the background worker, which
+    // locks the key away from content scripts before any student file is
+    // parsed here. A missing key stops only a new check, after the saved
+    // result lookup, because showing a saved result needs no key.
+    sendMessage({ type: "pangram-status" })
+      .then(function (status) {
+        hasKey = status.hasKey;
+        return alreadyRead || readSubmission(target);
+      })
+      .then(function (found) {
+        read = found;
+        return recheck ? null : loadSaved(read.hash);
       })
       .then(function (saved) {
         if (saved) {
-          update(state, {
-            status: "done",
-            attempt: submission.attempt,
-            hash: hash,
-            result: saved.result,
-            preview: saved.preview,
-            checkedAt: saved.checkedAt
-          });
+          showSavedResult(state, read, saved);
           return null;
         }
         if (!hasKey) {
@@ -478,6 +547,8 @@
         // Only a new check needs the roster, so a saved result still shows
         // when the roster cannot load.
         return loadRoster().then(function (roster) {
+          var submission = read.submission;
+          var extracted = read.extracted;
           var names = roster.names.concat(userNames(submission.user));
           var ids = roster.ids.concat(userIds(submission.user));
           var redactor = Redact.createRedactor(names, ids);
@@ -485,7 +556,7 @@
           update(state, {
             status: "ready",
             attempt: submission.attempt,
-            hash: hash,
+            hash: read.hash,
             preview: {
               text: redacted.text,
               names: redacted.names,
@@ -704,11 +775,12 @@
       return;
     }
 
-    // idle, preparing, ready, checking, or error: the checkbox first, so it
-    // stays put when the buttons under it change, then any error, then the
-    // buttons. While preparing or checking, the controls stay in place but
-    // are off, and a line under them shows the progress.
-    var busy = state.status === "preparing" || state.status === "checking";
+    // idle, looking, preparing, ready, checking, or error: the checkbox
+    // first, so it stays put when the buttons under it change, then any
+    // error, then the buttons. While looking, preparing, or checking, the
+    // controls stay in place but are off, and a line under them shows the
+    // progress.
+    var busy = state.status === "looking" || state.status === "preparing" || state.status === "checking";
     section.className = "bc-pg-section";
     section.appendChild(el("h3", "bc-pg-section-title", "Pangram"));
     section.appendChild(previewOption(busy));
@@ -725,7 +797,9 @@
     } else {
       fillSteps(section, target, state, busy);
     }
-    if (state.status === "preparing") {
+    if (state.status === "looking") {
+      section.appendChild(el("div", "bc-pg-busy", "Looking for a saved result…"));
+    } else if (state.status === "preparing") {
       section.appendChild(el("div", "bc-pg-busy", "Preparing the text…"));
     } else if (state.status === "checking") {
       section.appendChild(el("div", "bc-pg-busy", "Pangram is checking the text" + stageText(state.stage) + "…"));
@@ -750,6 +824,9 @@
       anchor.after(section);
     }
     var state = stateFor(target.key);
+    if (state.status === "idle" && !state.lookedUp) {
+      lookup(target);
+    }
     var stamp = [target.key, state.version, sendWithoutPreview].join("#");
     if (section.getAttribute(SECTION_MARK) !== stamp) {
       section.setAttribute(SECTION_MARK, stamp);
@@ -911,8 +988,8 @@
       footer.appendChild(button("Close", "bc-pg-primary", closeDialog));
       return;
     }
-    // idle, preparing, checking, or error: the section shows these, not the
-    // dialog.
+    // idle, looking, preparing, checking, or error: the section shows these,
+    // not the dialog.
     closeDialog();
   }
 
