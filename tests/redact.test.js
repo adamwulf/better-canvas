@@ -20,6 +20,10 @@ var redactor = Redact.createRedactor([
   "Maria de la Cruz", "de la Cruz, Maria",
   "John Smith III", "Smith, John III",
   "Soren Kjaer", "Łukasz Wójcik", "İlayda Yıldız", "Anna Strauß", "Chloe Lefevre",
+  "Anna deWitt", "张伟",
+  "Wei (David) Zhang", "Robert \"Bob\" Smithers",
+  "Lena Müller", "Karl Mueller", "Søren Holm",
+  "Maria Garcia Lopez", "Garcia Lopez, Maria",
   "X Y"
 ]);
 
@@ -72,6 +76,33 @@ check("Anna van der Berg", "[name]");
 check("interviewed van der Berg", "interviewed [name]");
 check("Omar al-Farsi and al-Farsi's plan", "[name] and [name]'s plan");
 check("De la Cruz said", "[name] said");
+
+// A capital inside the word, and scripts with no letter case.
+check("As deWitt argues", "As [name] argues");
+check("deWitt 1", "[name] 1");
+check("作者：张伟", "作者：[name]");
+
+// Nicknames in parentheses or quotes are names too.
+check("David Zhang wrote", "[name] wrote");
+check("david zhang wrote", "[name] wrote");
+check("Bob Smithers", "[name]");
+
+// The ae/oe/ue spelling of ä, ö, ü, and ø, in both directions.
+check("Lena Mueller", "[name]");
+check("Mueller 1", "[name] 1");
+check("Karl Müller", "[name]");
+check("Müller said", "[name] said");
+check("Soeren Holm", "[name]");
+
+// Lowercase short forms of a longer roster name.
+check("john smith\nENTR 222", "[name]\nENTR 222");
+check("maria garcia wrote", "[name] wrote");
+
+// The index map handles multi-unit folds, surrogate pairs, and combining
+// marks that NFC cannot compose.
+check("Strauß's essay", "[name]'s essay");
+check("😀 Jane Doe 😀", "😀 [name] 😀");
+check("D̲o̲e̲, ok", "[name], ok");
 
 // Lowercase particles and suffixes are not names on their own.
 check("Smith et al. (2020) found", "[name] et al. (2020) found");

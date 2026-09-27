@@ -583,8 +583,10 @@
       return;
     }
     if (state.status === "ready") {
-      body.appendChild(el("p", "", "This is the exact text that will go to Pangram. Student names are " +
-        "replaced with [name] and email addresses with [email]. Nothing has been sent yet."));
+      body.appendChild(el("p", "", "This is the exact text that will go to Pangram. Student names from " +
+        "the course roster are replaced with [name] and email addresses with [email]. Lowercase names, " +
+        "user names, and nicknames that are not on the roster are not replaced, so read the text before " +
+        "you send it. Nothing has been sent yet."));
       body.appendChild(facts(state.preview));
       body.appendChild(previewText(state.preview.text));
       footer.appendChild(button("Cancel", "", function () {
@@ -667,8 +669,15 @@
       panel.appendChild(body);
       panel.appendChild(footer);
       root.appendChild(panel);
+      // Close on a backdrop click only when the press also started on the
+      // backdrop: a drag that selects dialog text and ends outside the
+      // dialog makes Chrome send the click to the backdrop too.
+      var pressedBackdrop = false;
+      root.addEventListener("pointerdown", function (event) {
+        pressedBackdrop = event.target === root;
+      });
       root.addEventListener("click", function (event) {
-        if (event.target === root && event.detail <= 1) {
+        if (event.target === root && pressedBackdrop && event.detail <= 1) {
           closeDialog();
         }
       });

@@ -110,18 +110,21 @@ submission details. **Check with Pangram** checks the student on screen with
    segment — and as a one-line summary in the grading panel.
 
 Name matching covers each roster name, its sortable form (`Doe, Jane`), its
-short name, its first and last word (`Jane Doe` for `Jane Q. Doe`), the
-surname from the sortable form (`van der Berg`), and each part of two or more
-letters (`Jane`, `Doe`, the halves of `Mary-Jane`). Accents and letters such
-as ł, ø, and ß are ignored in both directions, so a roster spelling of
-`Jose Nunez` also catches `José Núñez`. A whole name (two or more words)
-matches in any case, such as `jane doe`. A single word must start with a
-capital letter, so ordinary lowercase words stay intact when a student is
-named Will, May, or Rose, or has a particle such as `de` or `al` in their
+short name, each ordered pair of its capitalized words (`Jane Doe` for
+`Jane Q. Doe`, `Maria Garcia` for `Maria Garcia Lopez`), the surname from the
+sortable form (`van der Berg`), and each part of two or more letters (`Jane`,
+`Doe`, the halves of `Mary-Jane`, a nickname such as `David` in
+`Wei (David) Zhang`). Accents and letters such as ł, ø, and ß are ignored in
+both directions, so a roster spelling of `Jose Nunez` also catches
+`José Núñez`, and `Müller` also catches `Mueller` (and the reverse). A whole
+name (two or more words) matches in any case, such as `jane doe`. A single
+word must have a capital letter (`Doe`, `DOE`, `deWitt`) or be in a script
+with no letter case, so ordinary lowercase words stay intact when a student
+is named Will, May, or Rose, or has a particle such as `de` or `al` in their
 name; suffixes such as `Jr` and `III` are never replaced alone. A lowercase
 name inside an email address is covered because the whole address is
-replaced. Check the preview for any other form of a name (a lowercase
-nickname or user name) before you send.
+replaced. The preview dialog reminds you to read the text for any other form
+of a name (a lowercase nickname or user name) before you send.
 
 Results are kept only until the page reloads. The check always reads the
 student's latest attempt.
@@ -206,9 +209,11 @@ is stored only in this browser. Each check uses Pangram API credits.
 - **Pangram check** — a content script (`src/speedgrader/pangram.js`, on
   `/courses/*/gradebook/speed_grader*` only) adds its section after the last
   submission-details block of the React SpeedGrader grading panel (the file
-  list, else the word count, else the "Submitted:" line), and a
-  `MutationObserver` keeps it there and in step with the `student_id` in the
-  URL as SpeedGrader switches students. The submission is shown in Canvas
+  list, else the word count, else the "Submitted:" line). A
+  `MutationObserver` and the Navigation API's `currententrychange` event keep
+  it there and in step with the `student_id` in the URL as SpeedGrader
+  switches students, and each of its buttons reads the URL again before it
+  acts, so it never checks a student who is no longer on screen. The submission is shown in Canvas
   DocViewer, a cross-origin iframe that draws each page, so the script does
   not read the page. It asks Canvas for the submission instead
   (`GET /api/v1/courses/:id/assignments/:id/submissions/:user_id?include[]=user`,

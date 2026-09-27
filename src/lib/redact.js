@@ -5,25 +5,27 @@
 // and every email address with "[email]".
 //
 // A roster name such as "Jane Q. Doe" (plus its sortable form "Doe, Jane Q."
-// and its short name) becomes a set of terms: each whole name, its first and
-// last word ("Jane Doe"), the surname from the sortable form ("van der
-// Berg"), and each part of two or more letters ("Jane", "Doe", and the halves
-// of a hyphenated name). Suffixes such as "Jr" and "III" are not terms.
+// and its short name) becomes a set of terms: each whole name, each ordered
+// pair of its capitalized words ("Jane Doe"), the surname from the sortable
+// form ("van der Berg"), and each part of two or more letters ("Jane", "Doe",
+// the halves of a hyphenated name, a nickname in parentheses or quotes).
+// Suffixes such as "Jr" and "III" are not terms.
 //
 // Terms and text are compared in a folded form: accents removed and letters
 // such as ł, ø, ß, and ı spelled out in plain Latin letters. So the roster
 // spelling "Jose Nunez" matches "José Núñez" in the text, and "Søren" matches
-// "Soren", in either direction.
+// "Soren", in either direction. A term with ä, ö, ü, å, or ø also gets its
+// ae/oe/ue/aa spelling ("Müller" and "Mueller"), in either direction.
 //
 // A match must stand alone as a word. A whole name (two or more words, such as
-// "jane doe" or "van der Berg") matches in any case. A single word must start
-// with a capital letter (Title Case or ALL CAPS) in one of its hyphen or
-// apostrophe parts ("Doe", "DOE", "al-Farsi"). Names are proper nouns, so this
-// keeps ordinary lowercase words intact when a student is named Will, May, or
-// Rose, or has a name particle such as "de" or "al". A lowercase single name
-// (a nickname or a user name) is not replaced; the preview shows the text so
-// the grader can see it. Email addresses are replaced first, so a lowercase
-// name inside one is covered.
+// "jane doe" or "van der Berg") matches in any case. A single word must have
+// an upper-case letter ("Doe", "DOE", "deWitt"), or be in a script with no
+// letter case. Names are proper nouns, so this keeps ordinary lowercase words
+// intact when a student is named Will, May, or Rose, or has a name particle
+// such as "de" or "al". A lowercase single name (a nickname or a user name) is
+// not replaced; the preview dialog says so and shows the text so the grader
+// can read it. Email addresses are replaced first, so a lowercase name inside
+// one is covered.
 //
 // Exposed as window.BetterCanvasRedact so sibling content scripts can use it.
 
@@ -117,13 +119,59 @@
     return comma === -1 ? "" : sortable.slice(0, comma);
   }
 
-  // "Jane Q. Doe" -> "Jane Doe", "John A. Smith III" -> "John Smith": how a
-  // student often writes a roster name that has a middle name.
-  function firstAndLast(name) {
-    var words = name.split(" ").filter(function (word) {
-      return !SUFFIX.test(word.replace(/[.,]/g, ""));
+  // A name part: split on spaces, commas, and the parentheses and quotes of a
+  // nickname ("Wei (David) Zhang", 'Robert "Bob" Smith').
+  var PART_SPLIT = /[\s,()"“”]+/;
+
+  function trimEdges(term) {
+    return term.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
+  }
+
+  // An upper-case letter anywhere ("Doe", "DOE", "deWitt"), or no cased
+  // letter at all (a name in Chinese, Arabic, or Devanagari) -- not "will",
+  // "de", or "van".
+  function capitalized(word) {
+    return /\p{Lu}/u.test(word) || !/[\p{Lu}\p{Ll}\p{Lt}]/u.test(word);
+  }
+
+  // Every ordered pair of capitalized name words: "Jane Doe" for "Jane Q.
+  // Doe", "John Smith" for "John Smith III", "Maria Garcia" and "Maria Lopez"
+  // for "Maria Garcia Lopez", "David Zhang" for "Wei (David) Zhang". This is
+  // how a student often writes a roster name in a paper. Particles ("de"),
+  // initials, and suffixes are left out.
+  function wordPairs(name) {
+    var words = name.split(PART_SPLIT).map(trimEdges).filter(function (word) {
+      return letterCount(word) >= MIN_LETTERS && !SUFFIX.test(word) && capitalized(word);
     });
-    return words.length >= 3 ? words[0] + " " + words[words.length - 1] : "";
+    var pairs = [];
+    for (var i = 0; i < words.length; i++) {
+      for (var j = i + 1; j < words.length; j++) {
+        pairs.push(words[i] + " " + words[j]);
+      }
+    }
+    return pairs;
+  }
+
+  // The second common spelling of ä, ö, ü, å, and ø ("Müller" and "Mueller"),
+  // both ways: a roster "Mueller" also gets "Muller", which is how the folded
+  // text spells "Müller".
+  var DIGRAPHS = {
+    "ä": "ae", "ö": "oe", "ü": "ue", "å": "aa", "ø": "oe",
+    "Ä": "Ae", "Ö": "Oe", "Ü": "Ue", "Å": "Aa", "Ø": "Oe"
+  };
+
+  function spellings(term) {
+    var forms = [term];
+    var digraphs = term.replace(/[äöüåøÄÖÜÅØ]/g, function (ch) {
+      return DIGRAPHS[ch];
+    });
+    var singles = term.replace(/([aouAOU])e|([aA])a/g, "$1$2");
+    [digraphs, singles].forEach(function (form) {
+      if (form !== term) {
+        forms.push(form);
+      }
+    });
+    return forms;
   }
 
   // Folded terms, split into whole names (with a space) and single words.
@@ -132,11 +180,16 @@
     var single = Object.create(null);
 
     function add(term) {
-      term = fold(tidy(term).replace(/^[.,'’-]+|[.,'’-]+$/g, ""));
+      term = trimEdges(tidy(term));
       if (letterCount(term) < MIN_LETTERS || SUFFIX.test(term)) {
         return;
       }
-      (/ /.test(term) ? whole : single)[term.toLowerCase()] = term;
+      spellings(term).forEach(function (form) {
+        form = fold(form);
+        if (letterCount(form) >= MIN_LETTERS) {
+          (/ /.test(form) ? whole : single)[form.toLowerCase()] = form;
+        }
+      });
     }
 
     names.forEach(function (raw) {
@@ -147,9 +200,9 @@
       var ordered = firstLast(name) || name;
       add(name);
       add(ordered);
-      add(firstAndLast(ordered));
       add(surname(name));
-      name.split(/[\s,]+/).forEach(function (part) {
+      wordPairs(ordered).forEach(add);
+      name.split(PART_SPLIT).forEach(function (part) {
         add(part);
         part.split(/[-‐‑]/).forEach(add);
       });
@@ -177,13 +230,6 @@
 
   function anyCase() {
     return true;
-  }
-
-  // "Doe", "DOE", "al-Farsi", "d'Artagnan" -- not "will" or "de".
-  function capitalized(word) {
-    return word.split(/[-‐‑'’]/).some(function (part) {
-      return /^\p{Lu}/u.test(part);
-    });
   }
 
   // Replaces each match of pattern (run on the folded text) that accept()
