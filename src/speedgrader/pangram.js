@@ -11,7 +11,8 @@
 //   3. Turn the submission into plain text in the browser: the text-entry
 //      body, or each PDF, Word (.docx), or .txt file
 //      (BetterCanvasSubmissionText).
-//   4. Replace every roster name with "[name]" and every email address with
+//   4. Replace every roster name with "[name]", every roster NetID (the
+//      Canvas login_id) with "[netid]", and every email address with
 //      "[email]" (BetterCanvasRedact). If the roster cannot load, the check
 //      stops here and nothing is sent.
 //   5. Show the redacted text in a dialog. Nothing leaves the browser until
@@ -50,7 +51,7 @@
   var ANONYMOUS_ID = /^[A-Za-z0-9]+$/;
 
   var checks = Object.create(null); // submission key -> check state
-  var rosterReady = null; // Promise<string[]>, loaded once per page
+  var rosterReady = null; // Promise<{ names, ids }>, loaded once per page
   var dialog = null; // { key, root, body, footer }
 
   // ---- Small helpers --------------------------------------------------------
@@ -155,20 +156,28 @@
     return user ? [user.name, user.sortable_name, user.short_name].filter(Boolean) : [];
   }
 
-  function loadRosterNames() {
+  // A user's NetID: the Canvas login ID, which Canvas includes only when the
+  // grader may see login IDs.
+  function userIds(user) {
+    return user && user.login_id ? [String(user.login_id)] : [];
+  }
+
+  // { names, ids } for every student on the roster.
+  function loadRoster() {
     if (!rosterReady) {
       var url = "/api/v1/courses/" + courseId + "/users?enrollment_type[]=student&per_page=100" +
         ROSTER_STATES.map(function (state) { return "&enrollment_state[]=" + state; }).join("");
       rosterReady = canvasAllPages(url)
         .then(function (users) {
-          var names = [];
+          var roster = { names: [], ids: [] };
           users.forEach(function (user) {
-            names = names.concat(userNames(user));
+            roster.names = roster.names.concat(userNames(user));
+            roster.ids = roster.ids.concat(userIds(user));
           });
-          if (!names.length) {
+          if (!roster.names.length) {
             throw new Error("the roster came back empty");
           }
-          return names;
+          return roster;
         })
         .catch(function (err) {
           rosterReady = null; // let a later check try again
@@ -320,22 +329,25 @@
           err.needsKey = true;
           throw err;
         }
-        return Promise.all([loadRosterNames(), loadSubmission(target)]);
+        return Promise.all([loadRoster(), loadSubmission(target)]);
       })
       .then(function (loaded) {
-        var names = loaded[0].concat(userNames(loaded[1].user));
+        var names = loaded[0].names.concat(userNames(loaded[1].user));
+        var ids = loaded[0].ids.concat(userIds(loaded[1].user));
         return submissionText(loaded[1]).then(function (extracted) {
           if (!extracted.text) {
             var detail = extracted.skipped.length ? " Skipped: " + extracted.skipped.join("; ") + "." : "";
             throw new Error("No text was found in this submission." + detail);
           }
-          var redacted = Redact.createRedactor(names).redact(extracted.text);
+          var redacted = Redact.createRedactor(names, ids).redact(extracted.text);
           update(state, {
             status: "ready",
             attempt: loaded[1].attempt,
             preview: {
               text: redacted.text,
               names: redacted.names,
+              ids: redacted.ids,
+              idsKnown: ids.length > 0,
               emails: redacted.emails,
               words: wordCount(redacted.text),
               sources: extracted.sources,
@@ -493,11 +505,11 @@
     return "bc-pg-seg-human";
   }
 
-  // The redacted text, with each [name] and [email] mark highlighted.
+  // The redacted text, with each [name], [netid], and [email] mark highlighted.
   function previewText(text) {
     var box = el("div", "bc-pg-text");
-    text.split(/(\[name\]|\[email\])/).forEach(function (part) {
-      if (part === Redact.NAME_MARK || part === Redact.EMAIL_MARK) {
+    text.split(/(\[name\]|\[netid\]|\[email\])/).forEach(function (part) {
+      if (part === Redact.NAME_MARK || part === Redact.ID_MARK || part === Redact.EMAIL_MARK) {
         box.appendChild(el("mark", "bc-pg-redacted", part));
       } else if (part) {
         box.appendChild(document.createTextNode(part));
@@ -560,6 +572,12 @@
   function facts(preview) {
     var list = el("ul", "bc-pg-facts");
     list.appendChild(el("li", "", "Names replaced: " + preview.names));
+    if (preview.idsKnown) {
+      list.appendChild(el("li", "", "NetIDs replaced: " + preview.ids));
+    } else {
+      list.appendChild(el("li", "bc-pg-skipped",
+        "NetIDs: Canvas did not share the roster's login IDs, so NetIDs were not replaced"));
+    }
     list.appendChild(el("li", "", "Email addresses replaced: " + preview.emails));
     list.appendChild(el("li", "", "Words: " + preview.words.toLocaleString()));
     list.appendChild(el("li", "", "From: " + preview.sources.join(", ")));
@@ -584,9 +602,9 @@
     }
     if (state.status === "ready") {
       body.appendChild(el("p", "", "This is the exact text that will go to Pangram. Student names from " +
-        "the course roster are replaced with [name] and email addresses with [email]. Lowercase names, " +
-        "user names, and nicknames that are not on the roster are not replaced, so read the text before " +
-        "you send it. Nothing has been sent yet."));
+        "the course roster are replaced with [name], their NetIDs with [netid], and email addresses with " +
+        "[email]. Lowercase names, user names, and nicknames that are not on the roster are not replaced, " +
+        "so read the text before you send it. Nothing has been sent yet."));
       body.appendChild(facts(state.preview));
       body.appendChild(previewText(state.preview.text));
       footer.appendChild(button("Cancel", "", function () {

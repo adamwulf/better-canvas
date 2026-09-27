@@ -268,9 +268,49 @@ check("jd45@rice.edu, Jane Doe", "[email], [name]", { names: 1, emails: 1 });
 check("by Jane\nDoe today", "by [name] today", { names: 1, emails: 0 });
 check("Jane\n\nDoe", "[name]\n\n[name]");
 
+// NetIDs: case-insensitive, whole words only; an email address goes first.
+var netids = Redact.createRedactor(["Jane Doe"], ["jd45", "ab123", "x1", "jd45@rice.edu", ""]);
+[
+  ["Submitted by jd45 on Monday", "Submitted by [netid] on Monday", 1],
+  ["JD45 and Ab123 worked together.", "[netid] and [netid] worked together.", 2],
+  ["jd456 and xjd45 are not NetIDs.", "jd456 and xjd45 are not NetIDs.", 0],
+  ["(jd45) jd45_notes.docx", "([netid]) [netid]_notes.docx", 2],
+  ["x1 is too short to count.", "x1 is too short to count.", 0]
+].forEach(function (row) {
+  var result = netids.redact(row[0]);
+  assert.strictEqual(result.text, row[1], JSON.stringify(row[0]));
+  assert.strictEqual(result.ids, row[2], "ids in " + JSON.stringify(row[0]));
+});
+var mailed = netids.redact("Email jd45@rice.edu or Jane Doe");
+assert.strictEqual(mailed.text, "Email [email] or [name]");
+assert.strictEqual(mailed.emails, 1);
+assert.strictEqual(mailed.ids, 0);
+
+// More name variants: a left-out apostrophe, the ʻokina, full-width letters
+// and ligatures, and names joined by an underscore or a dot.
+var variants = Redact.createRedactor([
+  "Mary-Jane O'Brien", "Kaʻiulani Akana", "Lani Ka'ahanui", "Griffin Lee", "Jane Q. Doe"
+]);
+[
+  ["OBrien 2", "[name] 2"],
+  ["O’Brien said", "[name] said"],
+  ["Ka'iulani wrote", "[name] wrote"],
+  ["Kaiulani wrote", "[name] wrote"],
+  ["Kaʻahanui wrote", "[name] wrote"],
+  ["Ｊａｎｅ Ｄｏｅ wrote", "[name] wrote"],
+  ["Griﬃn wrote", "[name] wrote"],
+  ["Jane_Doe_essay.pdf", "[name]_essay.pdf"],
+  ["see jane.doe on the forum", "see [name] on the forum"],
+  // Lowercase single words still stay.
+  ["obrien", "obrien"]
+].forEach(function (pair) {
+  assert.strictEqual(variants.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
+});
+
 // An empty roster changes nothing but email addresses.
 var empty = Redact.createRedactor([]);
 assert.strictEqual(empty.termCount, 0);
 assert.strictEqual(empty.redact("Jane Doe a@b.co").text, "Jane Doe [email]");
+assert.strictEqual(empty.redact("Jane Doe").ids, 0);
 
 console.log("Name redaction tests passed.");

@@ -100,11 +100,13 @@ submission details. **Check with Pangram** checks the student on screen with
 1. The submission text is read in the browser: a text entry, or each PDF,
    Word (`.docx`), or `.txt` file. Other files (images, old `.doc` files) are
    listed as skipped. A scanned PDF with no text layer has no text to check.
-2. Every student name on the course roster is replaced with `[name]`, and
+2. Every student name on the course roster is replaced with `[name]`, every
+   roster NetID (the Canvas login ID, such as `jd45`) with `[netid]`, and
    every email address with `[email]`.
-3. A dialog shows the exact redacted text, how many names and email addresses
-   were replaced, and the word count. **Nothing is sent until you click
-   Send to Pangram.**
+3. A dialog shows the exact redacted text, how many names, NetIDs, and email
+   addresses were replaced, and the word count. **Nothing is sent until you
+   click Send to Pangram.** If Canvas does not share the roster's login IDs
+   with you, the dialog says that NetIDs were not replaced.
 4. The result shows in the dialog — Pangram's verdict (AI / Mixed / Human),
    the AI, AI-assisted, and human percentages, and the text colored by
    segment — and as a one-line summary in the grading panel.
@@ -126,7 +128,10 @@ and `Smith-Jones` catches a lowercase `smith jones` (only when each half has
 name). Accents and letters such as
 ł, ø, and ß are ignored in both directions, so a roster spelling of
 `Jose Nunez` also catches `José Núñez`, and `Müller` also catches `Mueller`
-(and the reverse). A whole
+(and the reverse). Full-width letters and ligatures are read as plain
+letters, the ʻokina counts as an apostrophe, an apostrophe may be left out
+(`OBrien` for `O'Brien`), and the words of a whole name may be joined by an
+underscore or a dot (`Jane_Doe`, `jane.doe`). A whole
 name (two or more words) matches in any case, such as `jane doe`. A single
 word must have a capital letter (`Doe`, `DOE`, `deWitt`) or be in a script
 with no letter case, so ordinary lowercase words stay intact when a student
@@ -244,8 +249,10 @@ is stored only in this browser. Each check uses Pangram API credits.
   `.docx` whose document text would expand past 50 MB is refused.
   The roster comes from
   `GET /api/v1/courses/:id/users?enrollment_type[]=student` (all enrollment
-  states, every page), and `src/lib/redact.js` replaces names and email
-  addresses. If the roster cannot load, the check stops and nothing is sent.
+  states, every page), with each student's `login_id` (the NetID) when
+  Canvas includes it, and `src/lib/redact.js` replaces names, NetIDs, and
+  email addresses. If the roster cannot load, the check stops and nothing is
+  sent.
   After you click **Send to Pangram**, the redacted text goes to the
   background service worker (`src/background/service-worker.js`), which calls
   `POST https://text.external-api.pangram.com/task` with the saved key and
@@ -288,7 +295,7 @@ src/
   favicon/favicon.js            swaps the tab favicon
   lib/terms.js                  term parsing (season/year/sub-term)
   lib/grouping.js               semester bucketing (next/current/previous/older)
-  lib/redact.js                 replaces roster names and emails in text
+  lib/redact.js                 replaces roster names, NetIDs, and emails in text
   dashboard/dashboard.js        builds the grouped course list
   dashboard/dashboard.css       list styling
   tray/course-tray.js           regroups the "Courses" sidebar tray

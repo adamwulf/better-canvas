@@ -1,8 +1,9 @@
 // Better Canvas (Rice) — remove student names from text before it leaves the browser
 //
 // The Pangram check in SpeedGrader sends a submission's text to Pangram. Before
-// it does, every student name from the course roster is replaced with "[name]"
-// and every email address with "[email]".
+// it does, every student name from the course roster is replaced with "[name]",
+// every roster NetID (Canvas login ID, such as "jd45") with "[netid]", and
+// every email address with "[email]".
 //
 // A roster name such as "Jane Q. Doe" (plus its sortable form "Doe, Jane Q."
 // and its short name) becomes a set of terms: each whole name, its shorter
@@ -17,11 +18,14 @@
 // whole-name term with spaces, so "Smith-Jones" catches a lowercase
 // "smith jones" (but "In-Young" does not make the phrase "in young").
 //
-// Terms and text are compared in a folded form: accents removed and letters
-// such as ł, ø, ß, and ı spelled out in plain Latin letters. So the roster
-// spelling "Jose Nunez" matches "José Núñez" in the text, and "Søren" matches
-// "Soren", in either direction. A term with ä, ö, ü, å, or ø also gets its
-// ae/oe/ue/aa spelling ("Müller" and "Mueller"), in either direction.
+// Terms and text are compared in a folded form: accents removed, letters
+// such as ł, ø, ß, and ı spelled out in plain Latin letters, full-width
+// letters and ligatures spelled out, and the ʻokina read as an apostrophe. So
+// the roster spelling "Jose Nunez" matches "José Núñez" in the text, and
+// "Søren" matches "Soren", in either direction. A term with ä, ö, ü, å, or ø
+// also gets its ae/oe/ue/aa spelling ("Müller" and "Mueller"), in either
+// direction. An apostrophe may be left out ("OBrien" for "O'Brien"), and the
+// words of a whole name may be joined by an underscore or a dot ("Jane_Doe").
 //
 // A match must stand alone as a word. A whole name (two or more words, such as
 // "jane doe" or "van der Berg") matches in any case. A single word must have
@@ -43,19 +47,24 @@
 
   var NAME_MARK = "[name]";
   var EMAIL_MARK = "[email]";
+  var ID_MARK = "[netid]";
   var MIN_LETTERS = 2;
   var SUFFIX = /^(?:jr|sr|ii|iii|iv)$/i;
   var PARTICLE = /^(?:al|bin|ibn|da|das|de|del|della|den|der|di|do|dos|du|el|het|la|las|le|les|lo|los|op|ten|ter|van|vom|von|zu|zum|zur)$/i;
   var MAX_SLOTS = 5;
 
   // Letters, combining marks, and digits make up a word. A name match may not
-  // touch one of these on either side.
-  var WORD_CHAR = "[\\p{L}\\p{M}\\p{N}_]";
+  // touch one of these on either side. An underscore is not one, so the names
+  // in "Jane_Doe" still stand alone.
+  var WORD_CHAR = "[\\p{L}\\p{M}\\p{N}]";
 
   var EMAIL = /[\p{L}\p{N}._%+-]+@[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)+/gu;
 
-  // Letters that NFD does not split into a base letter and an accent.
+  // Letters that NFKD does not split into a base letter and an accent, and
+  // the marks used as an apostrophe in names (the Hawaiian ʻokina, the
+  // modifier-letter apostrophe, a left single quote).
   var PLAIN_LETTERS = {
+    "ʻ": "'", "ʼ": "'", "‘": "'", // ʻ ʼ ‘
     "ł": "l", "Ł": "L", // ł Ł
     "ø": "o", "Ø": "O", // ø Ø
     "ß": "ss", "ẞ": "SS", // ß ẞ
@@ -71,8 +80,9 @@
     return String(value || "").normalize("NFC").replace(/\s+/g, " ").trim();
   }
 
+  // NFKD also spells out full-width letters and ligatures ("Ｊａｎｅ", "ﬃ").
   function foldChar(ch) {
-    return PLAIN_LETTERS[ch] || ch.normalize("NFD").replace(/\p{M}+/gu, "");
+    return PLAIN_LETTERS[ch] || ch.normalize("NFKD").replace(/\p{M}+/gu, "");
   }
 
   function fold(value) {
@@ -107,16 +117,41 @@
     return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 
-  // Straight and curly apostrophes are the same character in a name, and a
-  // hyphen may be any hyphen, one space, or nothing ("Do-Hyun", "Do Hyun",
-  // or "Dohyun"). The space inside a whole name may be a hyphen ("smith-jones"
-  // for "smith jones"), or any run of whitespace with at most one line break:
-  // a name can wrap to the next line, but a blank line ends it.
+  // An apostrophe in a name may be straight, curly, or left out ("O'Brien",
+  // "O’Brien", "OBrien"), and a hyphen may be any hyphen, one space, or
+  // nothing ("Do-Hyun", "Do Hyun", "Dohyun"). The space inside a whole name
+  // may be a hyphen, an underscore, or a dot ("smith-jones", "Jane_Doe",
+  // "jane.doe"), or any run of whitespace with at most one line break: a
+  // name can wrap to the next line, but a blank line ends it.
   function termPattern(term) {
     return escapeRegExp(term)
-      .replace(/['’]/g, "['’]")
-      .replace(/ /g, "(?:\\u2010|\\u2011|\\x2d|(?=\\s)[^\\S\\n]*\\n?[^\\S\\n]*)")
+      .replace(/['’]/g, "['’]?")
+      .replace(/ /g, "(?:\\u2010|\\u2011|\\x2d|_|\\.|(?=\\s)[^\\S\\n]*\\n?[^\\S\\n]*)")
       .replace(/[-‐‑]/g, "[-‐‑ ]?");
+  }
+
+  // One case-insensitive regex for the roster's NetIDs (Canvas login IDs,
+  // such as "jd45"), each standing alone as a word. An ID shorter than 3
+  // characters is left out, and one with an @ is an email address, which the
+  // email pass already replaces.
+  function idRegExp(ids) {
+    var unique = Object.create(null);
+    (ids || []).forEach(function (id) {
+      id = String(id || "").trim();
+      if (id.length >= 3 && id.indexOf("@") === -1) {
+        unique[id.toLowerCase()] = id;
+      }
+    });
+    var keys = Object.keys(unique).sort(function (a, b) {
+      return b.length - a.length;
+    });
+    if (!keys.length) {
+      return null;
+    }
+    return new RegExp(
+      "(?<![\\p{L}\\p{N}])(?:" + keys.map(escapeRegExp).join("|") + ")(?![\\p{L}\\p{N}])",
+      "giu"
+    );
   }
 
   // "Doe, Jane Q." -> "Jane Q. Doe"
@@ -372,29 +407,40 @@
     return { text: out + text.slice(last), count: count };
   }
 
-  // Builds a redactor for a list of roster names. The returned redact(text)
-  // gives { text, names, emails }: the redacted text and how many names and
-  // email addresses it replaced.
-  function createRedactor(names) {
+  // Builds a redactor for the roster's names and NetIDs. The returned
+  // redact(text) gives { text, names, ids, emails }: the redacted text and
+  // how many names, NetIDs, and email addresses it replaced.
+  function createRedactor(names, ids) {
     var terms = collectTerms(names || []);
     // Whole names go first; the single-word pass then sees what is left.
     var wholeNames = termRegExp(terms.whole);
     var singleWords = termRegExp(terms.single);
+    var netIds = idRegExp(ids);
 
     // NFC here too, so composed and decomposed accents in the text fold the
-    // same way; lines and paragraphs are left as they are.
+    // same way; lines and paragraphs are left as they are. Email addresses go
+    // first (a NetID or a name inside one goes with it), then NetIDs, then
+    // names.
     function redact(text) {
       var emails = 0;
+      var idCount = 0;
       var current = String(text || "").normalize("NFC").replace(EMAIL, function () {
         emails++;
         return EMAIL_MARK;
       });
+      if (netIds) {
+        current = current.replace(netIds, function () {
+          idCount++;
+          return ID_MARK;
+        });
+      }
       var wholePass = replaceTerms(current, wholeNames, anyCase);
       var singlePass = replaceTerms(wholePass.text, singleWords, capitalized);
       return {
         // "Jane Doe" may become "[name] [name]"; one person reads as one mark.
         text: singlePass.text.replace(/\[name\](?:[ \t]+\[name\])+/g, NAME_MARK),
         names: wholePass.count + singlePass.count,
+        ids: idCount,
         emails: emails
       };
     }
@@ -408,6 +454,7 @@
   window.BetterCanvasRedact = {
     createRedactor: createRedactor,
     NAME_MARK: NAME_MARK,
-    EMAIL_MARK: EMAIL_MARK
+    EMAIL_MARK: EMAIL_MARK,
+    ID_MARK: ID_MARK
   };
 })();
