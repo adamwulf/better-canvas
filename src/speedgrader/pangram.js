@@ -1,8 +1,9 @@
 // Better Canvas (Rice) — Pangram AI-detection check in SpeedGrader
 //
 // Adds a "Pangram" section to the SpeedGrader grading panel, under the
-// submission details. "Check with Pangram" runs these steps for the student
-// on screen:
+// submission details. The section shows two steps for the student on screen:
+// "Prepare text for Pangram" and "Send to Pangram". Preparing runs these
+// steps:
 //
 //   1. Ask the background worker whether a Pangram API key is saved.
 //   2. Load the submission (GET /api/v1/courses/:id/assignments/:id/
@@ -18,14 +19,24 @@
 //   5. Show the redacted text in an editable box in a dialog, where the
 //      grader removes anything the rules missed. Nothing leaves the browser
 //      until "Send to Pangram" is clicked.
-//   6. The background worker sends only the text in that box to Pangram and
-//      the dialog shows the result, with the text colored by segment.
+//
+// "Send to Pangram", in the dialog or in the section, closes the dialog, and
+// the background worker sends only the text in that box to Pangram. The
+// section shows the progress and then the result; "Details" opens the result
+// in the dialog, with the text colored by segment.
+//
+// With "Send without preview" checked, the section shows only "Send to
+// Pangram", which prepares the text (steps 1-4) and sends it at once, with no
+// dialog. The Details dialog's "Check again" button then reads "Send to
+// Pangram again" and does the same. That one setting is saved in
+// chrome.storage.sync.
 //
 // SpeedGrader is a React app that switches students without a page load and
 // re-renders the grading panel, so a MutationObserver and the Navigation
 // API's currententrychange event keep the section in place and in step with
 // the student in the URL. Each section button checks the URL again before it
-// acts. Results are kept in memory for this page only; nothing is persisted.
+// acts. Check results are kept in memory for this page only; they are not
+// saved anywhere and are gone when the page reloads.
 
 (function () {
   "use strict";
@@ -50,10 +61,17 @@
   var ROSTER_STATES = ["active", "invited", "completed", "inactive"];
   var CANVAS_ID = /^\d+(?:~\d+)?$/;
   var ANONYMOUS_ID = /^[A-Za-z0-9]+$/;
+  var SEND_WITHOUT_PREVIEW = "pangramSendWithoutPreview"; // chrome.storage.sync key
+  var CATEGORIES = [
+    { key: "ai", label: "AI", field: "fraction_ai" },
+    { key: "assisted", label: "AI-assisted", field: "fraction_ai_assisted" },
+    { key: "human", label: "Human", field: "fraction_human" }
+  ];
 
   var checks = Object.create(null); // submission key -> check state
   var rosterReady = null; // Promise<{ names, ids }>, loaded once per page
   var dialog = null; // { key, root, body, footer }
+  var sendWithoutPreview = false;
 
   // ---- Small helpers --------------------------------------------------------
 
@@ -123,6 +141,25 @@
         }
       });
     });
+  }
+
+  function openOptions() {
+    sendMessage({ type: "open-options" }).catch(function (err) {
+      console.warn("[BetterCanvas] could not open options", err);
+    });
+  }
+
+  function setSendWithoutPreview(value) {
+    sendWithoutPreview = value;
+    var items = {};
+    items[SEND_WITHOUT_PREVIEW] = value;
+    Promise.resolve()
+      .then(function () {
+        return chrome.storage.sync.set(items);
+      })
+      .catch(function (err) {
+        console.warn("[BetterCanvas] could not save the Pangram setting", err);
+      });
   }
 
   // ---- Canvas API -----------------------------------------------------------
@@ -319,10 +356,15 @@
     renderDialog();
   }
 
-  function prepare(target) {
+  // Gets the submission text and redacts it. Without thenSend the dialog
+  // opens and then shows the text for review; with thenSend there is no
+  // dialog and the text goes to Pangram as soon as it is ready.
+  function prepare(target, thenSend) {
     var state = stateFor(target.key);
     update(state, { status: "preparing", error: "", needsKey: false, result: null, preview: null });
-    openDialog(target.key);
+    if (!thenSend) {
+      openDialog(target.key);
+    }
 
     // The key check runs first: it also starts the background worker, which
     // locks the key away from content scripts before any student file is
@@ -360,6 +402,9 @@
               skipped: extracted.skipped
             }
           });
+          if (thenSend) {
+            send(state);
+          }
         });
       })
       .catch(function (err) {
@@ -367,7 +412,11 @@
       });
   }
 
+  // The section shows the progress and the result, so the dialog closes.
   function send(state) {
+    if (dialog && dialog.key === state.key) {
+      closeDialog();
+    }
     update(state, { status: "checking", stage: "" });
     var started = Date.now();
 
@@ -403,6 +452,17 @@
       });
   }
 
+  // Sends the prepared text as the grader left it, or, when no text is
+  // prepared yet ("Send without preview"), prepares it and sends it at once.
+  function sendNow(target) {
+    var state = stateFor(target.key);
+    if (state.preview) {
+      send(state);
+    } else {
+      prepare(target, true);
+    }
+  }
+
   // ---- Grading-panel section ------------------------------------------------
 
   // The section goes right after the last submission-details block: the file
@@ -421,11 +481,42 @@
     return null;
   }
 
-  function summaryText(result) {
-    return (result.prediction_short || result.headline || "Result") + " — " +
-      percent(result.fraction_ai) + " AI, " +
-      percent(result.fraction_ai_assisted) + " AI-assisted, " +
-      percent(result.fraction_human) + " human";
+  function fraction(result, category) {
+    return Number(result[category.field]) || 0;
+  }
+
+  // The category with the largest share; the first one listed wins a tie.
+  function winner(result) {
+    return CATEGORIES.reduce(function (best, category) {
+      return fraction(result, category) > fraction(result, best) ? category : best;
+    });
+  }
+
+  // One line per category, the winner in bold.
+  function scoreLines(result, top) {
+    var lines = el("div", "bc-pg-scores");
+    CATEGORIES.forEach(function (category) {
+      lines.appendChild(el("div", category === top ? "bc-pg-winner" : "",
+        category.label + ": " + percent(fraction(result, category))));
+    });
+    return lines;
+  }
+
+  // What the redaction could not cover, shown with the result because a
+  // check sent without preview never showed the review dialog.
+  function sentNotes(preview) {
+    var notes = [];
+    if (!preview.idsKnown) {
+      notes.push("NetIDs were not replaced.");
+    }
+    if (preview.skipped.length) {
+      notes.push(preview.skipped.length === 1 ? "1 file was skipped." : preview.skipped.length + " files were skipped.");
+    }
+    return notes.length ? el("div", "bc-pg-skipped bc-pg-sent-notes", notes.join(" ")) : null;
+  }
+
+  function stageText(stage) {
+    return stage ? " (" + stage.replace(/^STAGE_/, "").toLowerCase().replace(/_/g, " ") + ")" : "";
   }
 
   // A section button acts only if its student is still the one in the URL;
@@ -445,34 +536,96 @@
     openDialog(target.key);
   }
 
+  function reviewText(target) {
+    update(stateFor(target.key), { status: "ready" });
+    openDialog(target.key);
+  }
+
+  function sectionRow(parent) {
+    var row = el("div", "bc-pg-section-row");
+    parent.appendChild(row);
+    return row;
+  }
+
+  // Step 1 prepares the text (or reopens it for review once it is ready);
+  // step 2 sends it, and is off until there is text to send.
+  function fillSteps(section, target, state) {
+    var first = sectionRow(section);
+    first.appendChild(el("span", "bc-pg-step-number", "1."));
+    if (state.preview) {
+      first.appendChild(button("Review text", "", forStudent(target.key, reviewText)));
+    } else {
+      first.appendChild(button("Prepare text for Pangram", "bc-pg-primary", forStudent(target.key, prepare)));
+    }
+    var second = sectionRow(section);
+    second.appendChild(el("span", "bc-pg-step-number", "2."));
+    var sendButton = button("Send to Pangram", state.preview ? "bc-pg-primary" : "", forStudent(target.key, sendNow));
+    sendButton.disabled = !state.preview;
+    second.appendChild(sendButton);
+  }
+
+  function previewOption() {
+    var label = el("label", "bc-pg-option");
+    var box = el("input");
+    box.type = "checkbox";
+    box.checked = sendWithoutPreview;
+    box.addEventListener("change", function () {
+      setSendWithoutPreview(box.checked);
+      renderSection();
+      // The redraw replaced the checkbox; keep keyboard focus on it.
+      var redrawn = document.querySelector("section[" + SECTION_MARK + "] .bc-pg-option input");
+      if (redrawn) {
+        redrawn.focus();
+      }
+    });
+    label.appendChild(box);
+    label.appendChild(document.createTextNode("Send without preview"));
+    return label;
+  }
+
   function fillSection(section, target, state) {
     section.textContent = "";
-    section.appendChild(el("h3", "bc-pg-section-title", "Pangram"));
-    var row = el("div", "bc-pg-section-row");
-    section.appendChild(row);
 
-    if (state.status === "preparing" || state.status === "checking" || state.status === "ready") {
-      var label = state.status === "ready" ? "Ready to send — review the text" : "Working…";
-      row.appendChild(button(label, "", forStudent(target.key, showDialog)));
-      return;
-    }
     if (state.status === "done") {
-      row.appendChild(el("span", "bc-pg-summary bc-pg-verdict-" + verdictClass(state.result), summaryText(state.result)));
-      row.appendChild(button("Details", "bc-pg-link", forStudent(target.key, showDialog)));
+      var result = state.result;
+      var top = winner(result);
+      section.className = "bc-pg-section bc-pg-tint-" + top.key;
+      section.appendChild(el("h3", "bc-pg-section-title",
+        "Pangram: " + (result.prediction_short || result.headline || "Result")));
+      section.appendChild(scoreLines(result, top));
+      var notes = sentNotes(state.preview);
+      if (notes) {
+        section.appendChild(notes);
+      }
+      sectionRow(section).appendChild(button("Details", "bc-pg-link", forStudent(target.key, showDialog)));
+      section.appendChild(previewOption()); // the mode "Check again" in Details uses
       return;
     }
+
+    section.className = "bc-pg-section";
+    section.appendChild(el("h3", "bc-pg-section-title", "Pangram"));
+    if (state.status === "preparing") {
+      section.appendChild(el("div", "bc-pg-busy", "Preparing the text…"));
+      return;
+    }
+    if (state.status === "checking") {
+      section.appendChild(el("div", "bc-pg-busy", "Pangram is checking the text" + stageText(state.stage) + "…"));
+      return;
+    }
+
+    // idle, ready, or error: the start buttons, after any error.
     if (state.status === "error") {
-      row.appendChild(el("span", "bc-pg-section-error", "Last check failed."));
-      if (state.preview) {
-        row.appendChild(button("Back to text", "bc-pg-primary", forStudent(target.key, function (current) {
-          update(state, { status: "ready" });
-          openDialog(current.key);
-        })));
-        row.appendChild(button("Start over", "", forStudent(target.key, prepare)));
-        return;
+      section.appendChild(el("div", "bc-pg-section-error", state.error));
+      if (state.needsKey) {
+        sectionRow(section).appendChild(button("Open options", "", openOptions));
       }
     }
-    row.appendChild(button("Check with Pangram", "bc-pg-primary", forStudent(target.key, prepare)));
+    if (sendWithoutPreview) {
+      sectionRow(section).appendChild(button("Send to Pangram", "bc-pg-primary", forStudent(target.key, sendNow)));
+    } else {
+      fillSteps(section, target, state);
+    }
+    section.appendChild(previewOption());
   }
 
   function renderSection() {
@@ -493,7 +646,7 @@
       anchor.after(section);
     }
     var state = stateFor(target.key);
-    var stamp = target.key + "#" + state.version;
+    var stamp = [target.key, state.version, sendWithoutPreview].join("#");
     if (section.getAttribute(SECTION_MARK) !== stamp) {
       section.setAttribute(SECTION_MARK, stamp);
       fillSection(section, target, state);
@@ -571,20 +724,15 @@
 
   function fractionBar(result) {
     var bar = el("div", "bc-pg-bar");
-    [
-      ["bc-pg-seg-ai", result.fraction_ai, "AI"],
-      ["bc-pg-seg-assisted", result.fraction_ai_assisted, "AI-assisted"],
-      ["bc-pg-seg-human", result.fraction_human, "Human"]
-    ].forEach(function (part) {
-      var piece = el("span", part[0]);
-      piece.style.flexGrow = String(Number(part[1]) || 0);
-      piece.title = part[2] + " " + percent(part[1]);
-      bar.appendChild(piece);
-    });
     var legend = el("div", "bc-pg-legend");
-    legend.appendChild(el("span", "bc-pg-key bc-pg-seg-ai", "AI " + percent(result.fraction_ai)));
-    legend.appendChild(el("span", "bc-pg-key bc-pg-seg-assisted", "AI-assisted " + percent(result.fraction_ai_assisted)));
-    legend.appendChild(el("span", "bc-pg-key bc-pg-seg-human", "Human " + percent(result.fraction_human)));
+    CATEGORIES.forEach(function (category) {
+      var share = fraction(result, category);
+      var piece = el("span", "bc-pg-seg-" + category.key);
+      piece.style.flexGrow = String(share);
+      piece.title = category.label + " " + percent(share);
+      bar.appendChild(piece);
+      legend.appendChild(el("span", "bc-pg-key bc-pg-seg-" + category.key, category.label + " " + percent(share)));
+    });
     var wrap = el("div");
     wrap.appendChild(bar);
     wrap.appendChild(legend);
@@ -639,13 +787,6 @@
       }));
       return;
     }
-    if (state.status === "checking") {
-      var stage = state.stage ? " (" + state.stage.replace(/^STAGE_/, "").toLowerCase().replace(/_/g, " ") + ")" : "";
-      body.appendChild(el("p", "bc-pg-busy", "Pangram is checking the text" + stage + "…"));
-      body.appendChild(el("p", "bc-pg-note", "You can close this dialog. The result will show in the grading panel."));
-      footer.appendChild(button("Close", "", closeDialog));
-      return;
-    }
     if (state.status === "done") {
       var result = state.result;
       var head = el("div", "bc-pg-result-head bc-pg-verdict-" + verdictClass(result));
@@ -655,11 +796,16 @@
       }
       body.appendChild(head);
       body.appendChild(fractionBar(result));
+      body.appendChild(facts(state.preview));
       body.appendChild(resultText(result));
-      footer.appendChild(button("Check again", "", function () {
+      // With "Send without preview" on, this sends at once, so it says so.
+      footer.appendChild(button(sendWithoutPreview ? "Send to Pangram again" : "Check again", "", function () {
         var target = currentTarget();
         if (target && target.key === state.key) {
-          prepare(target);
+          if (sendWithoutPreview) {
+            closeDialog(); // the section shows this check
+          }
+          prepare(target, sendWithoutPreview);
         }
       }));
       footer.appendChild(button("Close", "bc-pg-primary", closeDialog));
@@ -667,22 +813,13 @@
     }
     if (state.status === "error") {
       body.appendChild(el("p", "bc-pg-error", state.error));
-      if (state.preview) {
-        // A failed send keeps the edited text; go back to it to try again.
-        footer.appendChild(button("Back to text", "bc-pg-primary", function () {
-          update(state, { status: "ready" });
-        }));
-      }
       if (state.needsKey) {
-        footer.appendChild(button("Open options", "bc-pg-primary", function () {
-          sendMessage({ type: "open-options" }).catch(function (err) {
-            console.warn("[BetterCanvas] could not open options", err);
-          });
-        }));
+        footer.appendChild(button("Open options", "bc-pg-primary", openOptions));
       }
       footer.appendChild(button("Close", "", closeDialog));
       return;
     }
+    // idle or checking: the section shows these, not the dialog.
     closeDialog();
   }
 
@@ -778,4 +915,12 @@
   renderSection();
   new MutationObserver(scheduleRender).observe(document.body, { childList: true, subtree: true });
   navigation.addEventListener("currententrychange", scheduleRender);
+  chrome.storage.sync.get(SEND_WITHOUT_PREVIEW)
+    .then(function (items) {
+      sendWithoutPreview = items[SEND_WITHOUT_PREVIEW] === true;
+      renderSection();
+    })
+    .catch(function (err) {
+      console.warn("[BetterCanvas] could not read the Pangram setting", err);
+    });
 })();
