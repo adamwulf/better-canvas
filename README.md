@@ -134,8 +134,11 @@ letters, the ʻokina counts as an apostrophe, an apostrophe may be left out
 (`OBrien` for `O'Brien`), and the words of a whole name (and the halves of a
 hyphenated one) may be joined by an underscore, a dot, or nothing
 (`Jane_Doe`, `jane.doe`, `maria_garcia_lopez`, `JaneDoe`, `@janedoe`,
-`DeLaCruz`); a joined name with no capital inside needs 6 or more letters,
-so a short one such as `anle` is not taken for a word. A whole
+`DeLaCruz`, `Jimin` for `Ji Min Park`, `Subin` for `Su Bin Park`). A joined
+name in all lowercase needs 6 or more letters (so `anle` is not taken for a
+word), and it is not replaced when it is only the two halves of one
+hyphenated name, which may be an ordinary word (`wanting` for `Wan-Ting`;
+`Wanting` with a capital is still replaced). A whole
 name (two or more words) matches in any case, such as `jane doe`. A single
 word must have a capital letter (`Doe`, `DOE`, `deWitt`) or be in a script
 with no letter case, so ordinary lowercase words stay intact when a student

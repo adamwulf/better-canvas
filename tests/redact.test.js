@@ -336,6 +336,26 @@ var joins = Redact.createRedactor([
   assert.strictEqual(joins.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
 });
 
+// A capitalized joined name of any length, and joined neighboring words.
+var joined = Redact.createRedactor([
+  "Ji Min Park", "Jo Ann Smith", "An Le", "Su Bin Park", "Jia Le Chen", "Wan-Ting Li",
+  "Anna van der Berg"
+]);
+[
+  ["Jimin said hi.", "[name] said hi."],
+  ["Joann said hi.", "[name] said hi."],
+  ["AnLe wrote", "[name] wrote"],
+  ["Subin and SuBin", "[name] and [name]"],
+  ["Jiale and JiaLe", "[name] and [name]"],
+  ["Wanting to help, Wanting agreed.", "[name] to help, [name] agreed."],
+  // A lowercase join that is only a hyphenated name's halves may be a word.
+  ["I was wanting more.", "I was wanting more."],
+  ["the anle of it", "the anle of it"],
+  ["Vander Waals", "Vander Waals"]
+].forEach(function (pair) {
+  assert.strictEqual(joined.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
+});
+
 // An empty roster changes nothing but email addresses.
 var empty = Redact.createRedactor([]);
 assert.strictEqual(empty.termCount, 0);

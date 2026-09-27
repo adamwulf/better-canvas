@@ -315,10 +315,12 @@
     return forms;
   }
 
-  // Folded terms, split into whole names (with a space) and single words.
+  // Folded terms, split into whole names (with a space) and single words,
+  // plus the lowercase joined halves of hyphenated names (see wholeName).
   function collectTerms(names) {
     var whole = Object.create(null);
     var single = Object.create(null);
+    var joinedHalves = Object.create(null);
 
     function add(term) {
       term = trimEdges(tidy(term));
@@ -355,6 +357,15 @@
         if (edge || !lowercaseParticle(word)) {
           add(word);
         }
+        // Two neighboring words joined, as one capitalized word: "Subin" for
+        // "Su Bin Park", "Jiale" for "Jia Le Chen" -- a capitalized syllable
+        // that looks like a particle joins its next word as a unit, so no
+        // group holds this pair. Two lowercase particles ("van der") never
+        // make a pair.
+        var next = words[index + 1];
+        if (next && !(lowercaseParticle(word) && lowercaseParticle(next))) {
+          add(word + next);
+        }
         var halves = word.split(/[-‐‑]/);
         if (halves.length > 1) {
           // "smith jones" for "Smith-Jones", in any case -- but only when
@@ -362,6 +373,9 @@
           // "in young".
           if (halves.every(function (half) { return letterCount(half) >= 3; })) {
             add(halves.join(" "));
+            // Its halves joined in lowercase ("wanting" for "Wan-Ting") may
+            // be an ordinary word, so wholeName() does not take that form.
+            joinedHalves[fold(halves.join("")).toLowerCase()] = true;
           }
           halves.forEach(function (half) {
             if (!lowercaseParticle(half)) {
@@ -371,7 +385,7 @@
         }
       });
     });
-    return { whole: whole, single: single };
+    return { whole: whole, single: single, joinedHalves: joinedHalves };
   }
 
   // One regex for a set of terms, longest first, so "Mary-Jane" wins over
@@ -390,16 +404,6 @@
         ")(?!" + WORD_CHAR + ")",
       "giu"
     );
-  }
-
-  // A whole name matches in any case. Written with no space at all
-  // ("JaneDoe", "janedoe", "delacruz"), it also needs 6+ letters or a second
-  // capital, so a short joined name ("An Le" -> "anle") is not taken for an
-  // ordinary word.
-  function wholeName(match) {
-    return /[\s\-‐‑_.'’]/.test(match) ||
-      letterCount(match) >= JOINED_MIN_LETTERS ||
-      (match.match(/\p{Lu}/gu) || []).length >= 2;
   }
 
   // Replaces each match of pattern (run on the folded text) that accept()
@@ -436,6 +440,20 @@
     var singleWords = termRegExp(terms.single);
     var idList = netIdList(ids);
     var netIds = idRegExp(idList);
+
+    // A whole name matches in any case. Written with no space at all, it is
+    // a name when it has a capital ("JaneDoe", "Jimin" for "Ji Min") or, in
+    // lowercase, when it has 6+ letters ("janedoe", "delacruz") -- unless it
+    // is just the two halves of one hyphenated name, which may be an
+    // ordinary word ("wanting" for "Wan-Ting"). A short lowercase join
+    // ("anle" for "An Le") is not taken for a name either.
+    function wholeName(match) {
+      if (/[\s\-‐‑_.'’]/.test(match) || capitalized(match)) {
+        return true;
+      }
+      return letterCount(match) >= JOINED_MIN_LETTERS &&
+        !terms.joinedHalves[fold(match).toLowerCase()];
+    }
 
     // NFC here too, so composed and decomposed accents in the text fold the
     // same way; lines and paragraphs are left as they are. Email addresses go
