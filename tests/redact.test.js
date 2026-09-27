@@ -138,7 +138,7 @@ var units = Redact.createRedactor([
 ]);
 [
   ["As Das notes", "As [name] notes"],
-  ["Do argued", "[name] argued"],
+  ["As Do argued", "As [name] argued"],
   ["sofia cruz wrote", "[name] wrote"],
   ["ana silva wrote", "[name] wrote"],
   ["juan carlos garcia-lopez wrote", "[name] wrote"],
@@ -178,7 +178,7 @@ var syllables = Redact.createRedactor([
   ["Dohyun Kim wrote", "[name] wrote"],
   ["Elsayed wrote", "[name] wrote"],
   // A capitalized particle-like hyphen half alone, and in a lowercase group.
-  ["Do said so", "[name] said so"],
+  ["Then Do said so", "Then [name] said so"],
   ["Bin said so", "[name] said so"],
   ["do kim wrote", "[name] wrote"]
 ].forEach(function (pair) {
@@ -192,6 +192,7 @@ var hyphens = Redact.createRedactor([
 ]);
 [
   ["smith jones wrote", "[name] wrote"],
+  ["smith-jones wrote", "[name] wrote"],
   ["garcia lopez wrote", "[name] wrote"],
   ["mary kate wrote", "[name] wrote"],
   // A short-half given name never turns a common phrase into a name.
@@ -200,6 +201,19 @@ var hyphens = Redact.createRedactor([
   ["died so young", "died so young"]
 ].forEach(function (pair) {
   assert.strictEqual(hyphens.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
+});
+
+// A short name that is also a sentence opener is not replaced at the start of
+// a sentence or line, but is everywhere else.
+var openers = Redact.createRedactor(["Wei He", "Minh An", "Thanh Van Do", "In-Young Lee"]);
+[
+  ["He grew up poor. An important factor was school.", "He grew up poor. An important factor was school."],
+  ["Do you agree?\nIn short, yes. \"So what?\" (In fact, no.)", "Do you agree?\nIn short, yes. \"So what?\" (In fact, no.)"],
+  ["I met He at lunch.", "I met [name] at lunch."],
+  ["Wei He wrote this.", "[name] wrote this."],
+  ["As An and Do argued", "As [name] and [name] argued"]
+].forEach(function (pair) {
+  assert.strictEqual(openers.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
 });
 
 // A lowercase particle inside a roster name, or as half of a hyphenated

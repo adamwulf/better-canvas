@@ -28,7 +28,9 @@
 // an upper-case letter ("Doe", "DOE", "deWitt"), or be in a script with no
 // letter case. Names are proper nouns, so this keeps ordinary lowercase words
 // intact when a student is named Will, May, or Rose, or has a name particle
-// such as "de" or "al". A lowercase single name (a nickname or a user name) is
+// such as "de" or "al". A short single-word name that is also a common
+// sentence opener ("He", "An", "In", "So", "Do") is not replaced at the start
+// of a sentence or line. A lowercase single name (a nickname or a user name) is
 // not replaced; the preview dialog says so and shows the text so the grader
 // can read it. Email addresses are replaced first, so a lowercase name inside
 // one is covered.
@@ -44,6 +46,9 @@
   var SUFFIX = /^(?:jr|sr|ii|iii|iv)$/i;
   var PARTICLE = /^(?:al|bin|ibn|da|das|de|del|della|den|der|di|do|dos|du|el|het|la|las|le|les|lo|los|op|ten|ter|van|vom|von|zu|zum|zur)$/i;
   var MAX_SLOTS = 5;
+  // Short words that often open an English sentence and are also name parts
+  // ("He" and "An" as surnames, "In" and "So" as Korean syllables).
+  var OPENERS = /^(?:an|as|at|be|by|do|go|he|if|in|is|it|me|my|no|of|oh|on|or|so|to|up|us|we)$/i;
 
   // Letters, combining marks, and digits make up a word. A name match may not
   // touch one of these on either side.
@@ -106,13 +111,13 @@
 
   // Straight and curly apostrophes are the same character in a name, and a
   // hyphen may be any hyphen, one space, or nothing ("Do-Hyun", "Do Hyun",
-  // or "Dohyun"). The space inside a whole name may be any run of whitespace
-  // with at most one line break: a name can wrap to the next line, but a
-  // blank line ends it.
+  // or "Dohyun"). The space inside a whole name may be a hyphen ("smith-jones"
+  // for "smith jones"), or any run of whitespace with at most one line break:
+  // a name can wrap to the next line, but a blank line ends it.
   function termPattern(term) {
     return escapeRegExp(term)
       .replace(/['’]/g, "['’]")
-      .replace(/ /g, "(?=\\s)[^\\S\\n]*\\n?[^\\S\\n]*")
+      .replace(/ /g, "(?:\\u2010|\\u2011|\\x2d|(?=\\s)[^\\S\\n]*\\n?[^\\S\\n]*)")
       .replace(/[-‐‑]/g, "[-‐‑ ]?");
   }
 
@@ -345,8 +350,31 @@
     return true;
   }
 
+  // True when text[start] begins a sentence or a line: only opening quotes,
+  // brackets, and spaces sit between it and the text start, a line break, or
+  // a . ! ? or : before it.
+  function sentenceStart(text, start) {
+    var i = start - 1;
+    while (i >= 0 && text[i] !== "\n" && /["'“‘(\[\s]/.test(text[i])) {
+      i--;
+    }
+    return i < 0 || /[.!?:\n]/.test(text[i]);
+  }
+
+  // A single-word name must be capitalized. A short name that is also a
+  // common sentence-opening word ("He", "An", "In", "So", "Do") is not
+  // replaced at the start of a sentence or line, where it is nearly always
+  // the ordinary word ("He grew up poor.", "Do you agree?").
+  function singleName(word, text, start) {
+    if (!capitalized(word)) {
+      return false;
+    }
+    return !(OPENERS.test(fold(word)) && sentenceStart(text, start));
+  }
+
   // Replaces each match of pattern (run on the folded text) that accept()
-  // allows, judged on the original spelling. Returns the new text and count.
+  // allows, judged on the original spelling and its place in the text.
+  // Returns the new text and count.
   function replaceTerms(text, pattern, accept) {
     if (!pattern) {
       return { text: text, count: 0 };
@@ -360,7 +388,7 @@
     while ((match = pattern.exec(folded.folded)) !== null) {
       var start = folded.map[match.index];
       var end = folded.map[match.index + match[0].length];
-      if (accept(text.slice(start, end))) {
+      if (accept(text.slice(start, end), text, start)) {
         out += text.slice(last, start) + NAME_MARK;
         last = end;
         count++;
@@ -387,7 +415,7 @@
         return EMAIL_MARK;
       });
       var wholePass = replaceTerms(current, wholeNames, anyCase);
-      var singlePass = replaceTerms(wholePass.text, singleWords, capitalized);
+      var singlePass = replaceTerms(wholePass.text, singleWords, singleName);
       return {
         // "Jane Doe" may become "[name] [name]"; one person reads as one mark.
         text: singlePass.text.replace(/\[name\](?:[ \t]+\[name\])+/g, NAME_MARK),
