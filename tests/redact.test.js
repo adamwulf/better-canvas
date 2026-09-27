@@ -176,17 +176,28 @@ var syllables = Redact.createRedactor([
   ["mohamed el sayed wrote", "[name] wrote"],
   ["El Sayed wrote", "[name] wrote"],
   ["Dohyun Kim wrote", "[name] wrote"],
-  ["Elsayed wrote", "[name] wrote"]
+  ["Elsayed wrote", "[name] wrote"],
+  // A capitalized particle-like hyphen half alone, and in a lowercase group.
+  ["Do said so", "[name] said so"],
+  ["Bin said so", "[name] said so"],
+  ["do kim wrote", "[name] wrote"]
 ].forEach(function (pair) {
   assert.strictEqual(syllables.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
 });
 
 // A hyphenated name part written as two lowercase words.
-var hyphens = Redact.createRedactor(["Emily Smith-Jones", "Ana García-López", "Mary-Kate Olsen"]);
+var hyphens = Redact.createRedactor([
+  "Emily Smith-Jones", "Ana García-López", "Mary-Kate Olsen",
+  "In-Young Lee", "Do-Young Park", "So-Young Kim"
+]);
 [
   ["smith jones wrote", "[name] wrote"],
   ["garcia lopez wrote", "[name] wrote"],
-  ["mary kate wrote", "[name] wrote"]
+  ["mary kate wrote", "[name] wrote"],
+  // A short-half given name never turns a common phrase into a name.
+  ["Obesity in young children", "Obesity in young children"],
+  ["why do young people", "why do young people"],
+  ["died so young", "died so young"]
 ].forEach(function (pair) {
   assert.strictEqual(hyphens.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
 });

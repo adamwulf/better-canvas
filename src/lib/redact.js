@@ -13,8 +13,9 @@
 // "Anna van der Berg", "al" in "Omar al-Farsi") is not a term on its own.
 // Suffixes such as "Jr" and "III" are not terms. A hyphen in a term also
 // matches a space or nothing, so "Do-Hyun" catches "Do Hyun" and "Dohyun",
-// and each hyphenated word is also a whole-name term with spaces, so
-// "Smith-Jones" catches a lowercase "smith jones".
+// and a hyphenated word whose halves all have 3+ letters is also a
+// whole-name term with spaces, so "Smith-Jones" catches a lowercase
+// "smith jones" (but "In-Young" does not make the phrase "in young").
 //
 // Terms and text are compared in a folded form: accents removed and letters
 // such as ł, ø, ß, and ı spelled out in plain Latin letters. So the roster
@@ -305,7 +306,12 @@
         }
         var halves = word.split(/[-‐‑]/);
         if (halves.length > 1) {
-          add(halves.join(" ")); // "smith jones" for "Smith-Jones", in any case
+          // "smith jones" for "Smith-Jones", in any case -- but only when
+          // each half has 3+ letters, so "In-Young" never makes the phrase
+          // "in young".
+          if (halves.every(function (half) { return letterCount(half) >= 3; })) {
+            add(halves.join(" "));
+          }
           halves.forEach(function (half) {
             if (!lowercaseParticle(half)) {
               add(half);
