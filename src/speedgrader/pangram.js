@@ -547,28 +547,33 @@
   }
 
   // Step 1 prepares the text (once it is ready, "Details" opens it for
-  // review); step 2 sends it, and is off until there is text to send.
-  function fillSteps(section, target, state) {
+  // review); step 2 sends it, and is off until there is text to send. While
+  // busy, both steps are off.
+  function fillSteps(section, target, state, busy) {
     var first = sectionRow(section);
     first.appendChild(el("span", "bc-pg-step-number", "1."));
+    var firstButton;
     if (state.preview) {
       first.appendChild(el("span", "", "Text prepared"));
-      first.appendChild(button("Details", "bc-pg-link", forStudent(target.key, reviewText)));
+      firstButton = button("Details", "bc-pg-link", forStudent(target.key, reviewText));
     } else {
-      first.appendChild(button("Prepare text for Pangram", "bc-pg-primary", forStudent(target.key, prepare)));
+      firstButton = button("Prepare text for Pangram", "bc-pg-primary", forStudent(target.key, prepare));
     }
+    firstButton.disabled = busy;
+    first.appendChild(firstButton);
     var second = sectionRow(section);
     second.appendChild(el("span", "bc-pg-step-number", "2."));
     var sendButton = button("Send to Pangram", state.preview ? "bc-pg-primary" : "", forStudent(target.key, sendNow));
-    sendButton.disabled = !state.preview;
+    sendButton.disabled = busy || !state.preview;
     second.appendChild(sendButton);
   }
 
-  function previewOption() {
-    var label = el("label", "bc-pg-option");
+  function previewOption(disabled) {
+    var label = el("label", "bc-pg-option" + (disabled ? " bc-pg-option-off" : ""));
     var box = el("input");
     box.type = "checkbox";
     box.checked = sendWithoutPreview;
+    box.disabled = !!disabled;
     box.addEventListener("change", function () {
       setSendWithoutPreview(box.checked);
       renderSection();
@@ -602,18 +607,14 @@
       return;
     }
 
+    // idle, preparing, ready, checking, or error: the checkbox first, so it
+    // stays put when the buttons under it change, then any error, then the
+    // buttons. While preparing or checking, the controls stay in place but
+    // are off, and a line under them shows the progress.
+    var busy = state.status === "preparing" || state.status === "checking";
     section.className = "bc-pg-section";
     section.appendChild(el("h3", "bc-pg-section-title", "Pangram"));
-    if (state.status === "preparing") {
-      section.appendChild(el("div", "bc-pg-busy", "Preparing the text…"));
-      return;
-    }
-    if (state.status === "checking") {
-      section.appendChild(el("div", "bc-pg-busy", "Pangram is checking the text" + stageText(state.stage) + "…"));
-      return;
-    }
-
-    // idle, ready, or error: the start buttons, after any error.
+    section.appendChild(previewOption(busy));
     if (state.status === "error") {
       section.appendChild(el("div", "bc-pg-section-error", state.error));
       if (state.needsKey) {
@@ -621,11 +622,17 @@
       }
     }
     if (sendWithoutPreview) {
-      sectionRow(section).appendChild(button("Send to Pangram", "bc-pg-primary", forStudent(target.key, sendNow)));
+      var sendButton = button("Send to Pangram", "bc-pg-primary", forStudent(target.key, sendNow));
+      sendButton.disabled = busy;
+      sectionRow(section).appendChild(sendButton);
     } else {
-      fillSteps(section, target, state);
+      fillSteps(section, target, state, busy);
     }
-    section.appendChild(previewOption());
+    if (state.status === "preparing") {
+      section.appendChild(el("div", "bc-pg-busy", "Preparing the text…"));
+    } else if (state.status === "checking") {
+      section.appendChild(el("div", "bc-pg-busy", "Pangram is checking the text" + stageText(state.stage) + "…"));
+    }
   }
 
   function renderSection() {
