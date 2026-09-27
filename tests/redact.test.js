@@ -68,7 +68,10 @@ check("Anna Strauss", "[name]");
 
 // Whole names match in any case; single words must be capitalized.
 check("jane doe\nENTR 222", "[name]\nENTR 222", { names: 1, emails: 0 });
-check("Will may go. May will stay.", "[name] go. [name] will stay.");
+// "Will may" and "May will" are the name in both orders (a whole name
+// matches in any case); a lone lowercase "will" or "may" stays.
+check("Will may go. May will stay.", "[name] go. [name] stay.");
+check("You will see it may rain. May we go?", "You will see it may rain. [name] we go?");
 check("you will see", "you will see", { names: 0, emails: 0 });
 
 // Surnames with particles match as a whole, in any case.
@@ -407,6 +410,24 @@ var digits = Redact.createRedactor(["Jane Q. Doe"]);
   ["Doe2 wrote", "Doe2 wrote"] // a short name next to a digit is kept
 ].forEach(function (pair) {
   assert.strictEqual(digits.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
+});
+
+// Surname first with no comma, and other characters used as an apostrophe.
+var surnameFirst = Redact.createRedactor([
+  "Seoyeon Kim", "Kim, Seoyeon", "Wei Li", "Li, Wei", "Mary O'Brien", "Ravi D'Souza", "An Le"
+]);
+[
+  ["KimSeoyeon wrote", "[name] wrote"],
+  ["kimseoyeon wrote", "[name] wrote"],
+  ["kim_seoyeon.pdf", "[name].pdf"],
+  ["li_wei and li wei", "[name] and [name]"],
+  ["follow @liwei2026", "follow @[name]2026"],
+  ["Mary O´Brien and D`Souza", "[name] and [name]"],
+  // A short lowercase join in prose is still not a name.
+  ["the anle of it", "the anle of it"],
+  ["follow @anle", "follow @[name]"]
+].forEach(function (pair) {
+  assert.strictEqual(surnameFirst.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
 });
 
 // An empty roster changes nothing but email addresses.

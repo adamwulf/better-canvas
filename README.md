@@ -112,7 +112,8 @@ submission details. **Check with Pangram** checks the student on screen with
    the AI, AI-assisted, and human percentages, and the text colored by
    segment — and as a one-line summary in the grading panel.
 
-Name matching covers each roster name, its sortable form (`Doe, Jane`), its
+Name matching covers each roster name, its sortable form (`Doe, Jane`, and
+the same without the comma, `Doe Jane`, for names written surname first), its
 short name, its shorter forms (`Jane Doe` for `Jane Q. Doe`, `Maria Garcia`
 for `Maria Garcia Lopez`, `Ana da Silva` for `Ana Maria Da Silva`, `Kevin Le`
 for `Kevin Minh Le`, `Ana García` for `Ana García-López`; a particle such as
@@ -130,19 +131,21 @@ name). Accents and letters such as
 ł, ø, and ß are ignored in both directions, so a roster spelling of
 `Jose Nunez` also catches `José Núñez`, and `Müller` also catches `Mueller`
 (and the reverse). Full-width letters and ligatures are read as plain
-letters, the ʻokina counts as an apostrophe, an apostrophe may be left out
+letters, the ʻokina, an acute accent, and a backtick count as an apostrophe
+(`O´Brien`), an apostrophe may be left out
 (`OBrien` for `O'Brien`), and the words of a whole name (and the halves of a
 hyphenated one) may be joined by an underscore, a dot, or nothing
 (`Jane_Doe`, `jane.doe`, `maria_garcia_lopez`, `JaneDoe`, `@janedoe`,
 `DeLaCruz`, `Jimin` for `Ji Min Park`). Two neighboring name words joined
 into one word are also caught when capitalized (`Subin` for `Su Bin Park`,
 `Xiaole` for `Xiao Le Wang`); in lowercase that form falls under the
-lowercase-single-name rule below. A whole name joined in all lowercase needs
-6 or more letters (so `anle` is not taken for a word). When it is only the two halves of one hyphenated name, it may be an
-ordinary word (`wanting` for `Wan-Ting`), so in prose it is kept, but in a
-path, URL, file name, or handle it is replaced (any non-space run with
+lowercase-single-name rule below. A whole name joined in all lowercase is
+always replaced in a path, URL, file name, or handle (any non-space run with
 `@ / \ _ =` or a dot between letters or digits: `/Users/seoyeon/`,
-`@annemarie`, `maryjane-essay.pdf`, `?user=seoyeon`); `Wanting` with a
+`@liwei`, `maryjane-essay.pdf`, `?user=seoyeon`) or next to a digit
+(`liwei2026`). In prose it needs 6 or more letters (so `anle` is not taken
+for a word), and it may not be just the two halves of one hyphenated name,
+which may be an ordinary word (`wanting` for `Wan-Ting`); `Wanting` with a
 capital is always replaced. A name may touch a digit (`@JaneDoe2026`,
 `janedoe99`), except a single-word name of fewer than 4 letters, which next
 to a digit is more likely a formula or a code (`Li2O` for a student named

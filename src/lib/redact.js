@@ -66,9 +66,10 @@
 
   // Letters that NFKD does not split into a base letter and an accent, and
   // the marks used as an apostrophe in names (the Hawaiian ʻokina, the
-  // modifier-letter apostrophe, a left single quote).
+  // modifier-letter apostrophe, a left single quote, an acute accent, a
+  // backtick: "O´Brien", "D`Souza").
   var PLAIN_LETTERS = {
-    "ʻ": "'", "ʼ": "'", "‘": "'", // ʻ ʼ ‘
+    "ʻ": "'", "ʼ": "'", "‘": "'", "´": "'", "`": "'", // ʻ ʼ ‘ ´ `
     "ł": "l", "Ł": "L", // ł Ł
     "ø": "o", "Ø": "O", // ø Ø
     "ß": "ss", "ẞ": "SS", // ß ẞ
@@ -347,6 +348,7 @@
       var ordered = firstLast(name) || name;
       add(name);
       add(ordered);
+      add(name.replace(/\s*,\s*/, " ")); // surname first, no comma: "Kim Seoyeon"
       add(surname(name));
       shortForms(ordered).forEach(add);
       // Single words. A lowercase particle inside the name ("van" in "Anna van
@@ -476,24 +478,24 @@
     var netIds = idRegExp(idList);
 
     // A whole name matches in any case. Written with no space at all, it is
-    // a name when it has a capital ("JaneDoe", "Jimin" for "Ji Min") or, in
-    // lowercase, when it has 6+ letters ("janedoe", "delacruz"); a short
-    // lowercase join ("anle" for "An Le") is not taken for a name. The two
-    // halves of one hyphenated name joined in lowercase may be an ordinary
-    // word in prose ("wanting" for "Wan-Ting"), so that form is taken only in
-    // a path, URL, file name, or handle ("/Users/seoyeon/", "@annemarie",
-    // "maryjane_essay.pdf") or next to a digit ("seoyeon2026").
+    // a name when it has a capital ("JaneDoe", "Jimin" for "Ji Min"), or when
+    // it is part of a path, URL, file name, or handle ("/Users/seoyeon/",
+    // "@liwei", "maryjane_essay.pdf") or touches a digit ("liwei2026"). In
+    // lowercase prose it needs 6+ letters ("janedoe", "delacruz"), so a short
+    // join ("anle" for "An Le") is not taken for a word, and it may not be
+    // just the two halves of one hyphenated name, which may be an ordinary
+    // word ("wanting" for "Wan-Ting").
     function wholeName(match, text, start) {
       if (/[\s\-‐‑_.'’]/.test(match) || capitalized(match)) {
         return true;
       }
-      if (letterCount(match) < JOINED_MIN_LETTERS) {
-        return false;
-      }
       var end = start + match.length;
-      return !terms.joinedHalves[fold(match).toLowerCase()] ||
-        inPathOrHandle(text, start, end) ||
-        /\p{N}/u.test(text[start - 1] || "") || /\p{N}/u.test(text[end] || ""); // "seoyeon2026"
+      if (inPathOrHandle(text, start, end) ||
+          /\p{N}/u.test(text[start - 1] || "") || /\p{N}/u.test(text[end] || "")) {
+        return true;
+      }
+      return letterCount(match) >= JOINED_MIN_LETTERS &&
+        !terms.joinedHalves[fold(match).toLowerCase()];
     }
 
     // NFC here too, so composed and decomposed accents in the text fold the
