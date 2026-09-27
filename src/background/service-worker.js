@@ -108,6 +108,16 @@ function getTask(taskId) {
   });
 }
 
+// Whether any result is saved, so the SpeedGrader script reads a student's
+// submission to look for one only when one could be found.
+function hasResults() {
+  return chrome.storage.local.getKeys().then(function (names) {
+    return names.some(function (name) {
+      return name.indexOf(RESULT_PREFIX) === 0;
+    });
+  });
+}
+
 function loadResult(hash) {
   var name = RESULT_PREFIX + hash;
   return chrome.storage.local.get(name).then(function (items) {
@@ -126,8 +136,8 @@ function saveResult(hash, saved) {
 function handle(message) {
   switch (message && message.type) {
     case "pangram-status":
-      return loadKey().then(function (key) {
-        return { hasKey: key !== "" };
+      return Promise.all([loadKey(), hasResults()]).then(function (found) {
+        return { hasKey: found[0] !== "", hasResults: found[1] };
       });
     case "pangram-create-task":
       if (typeof message.text !== "string" || !message.text.trim()) {

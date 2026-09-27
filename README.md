@@ -151,6 +151,11 @@ Each result is saved in this browser, under a SHA-256 hash of the
 submission's text: all of its files joined, before names are replaced and
 before any edit. When you prepare a submission whose text has a saved result,
 the box shows that result and the time of the check, and nothing is sent.
+You do not have to prepare it first: once any result is saved, the box looks
+for a saved result each time a student comes up (it says **Looking for a
+saved result…** while it reads the text in the browser) and shows it at once.
+The lookup sends nothing and needs no API key. With no saved result, the box
+stays at step 1, and **Prepare text for Pangram** uses the text already read.
 **Check again** (or **Send to Pangram again**) in **Details** always makes a
 new check, and its result replaces the saved one. The check always reads the
 student's latest attempt, so a new attempt with new text gets a new check.
@@ -272,7 +277,9 @@ is stored only in this browser. Each check uses Pangram API credits.
   (the content script cannot reach that area), as
   `pangramResult:<SHA-256 of the joined text>`: Pangram's result, the
   replacement counts, and the time of the check. The `unlimitedStorage`
-  permission lifts that area's 10 MB limit.
+  permission lifts that area's 10 MB limit. The worker's status answer also
+  says whether any result is saved; only then does the script read each
+  student's submission, when it comes up, to look for its saved result.
 
 The Canvas features send only same-origin requests to the Canvas site you are
 on (`canvas.rice.edu` or `hq.globaltech.org`) using your existing session
