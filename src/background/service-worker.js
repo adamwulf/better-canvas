@@ -15,11 +15,18 @@
 // polled until the stage is STAGE_SUCCESS or STAGE_FAILED. The content script
 // drives the polling with one message per poll, because a pending timer does
 // not keep an MV3 service worker alive but each incoming message does.
+//
+// Check results are saved in the same area, so the content script also reads
+// and writes them through this worker. Each result is stored under
+// "pangramResult:" plus the SHA-256 hash of the submission text it is for, and
+// the worker builds that name itself, so a message can reach no other item.
 
 "use strict";
 
 var API_BASE = "https://text.external-api.pangram.com";
 var KEY_NAME = "pangramApiKey";
+var RESULT_PREFIX = "pangramResult:"; // the options page deletes these too
+var TEXT_HASH = /^[0-9a-f]{64}$/;
 
 // Every message waits for this, so the area is locked before the SpeedGrader
 // script hears back and goes on to parse a student file. If the lock fails,
@@ -101,6 +108,21 @@ function getTask(taskId) {
   });
 }
 
+function loadResult(hash) {
+  var name = RESULT_PREFIX + hash;
+  return chrome.storage.local.get(name).then(function (items) {
+    return { saved: items[name] || null };
+  });
+}
+
+function saveResult(hash, saved) {
+  var items = {};
+  items[RESULT_PREFIX + hash] = saved;
+  return chrome.storage.local.set(items).then(function () {
+    return {};
+  });
+}
+
 function handle(message) {
   switch (message && message.type) {
     case "pangram-status":
@@ -117,6 +139,19 @@ function handle(message) {
         return Promise.reject(new Error("Missing Pangram task id."));
       }
       return getTask(message.taskId);
+    case "pangram-load-result":
+      if (typeof message.hash !== "string" || !TEXT_HASH.test(message.hash)) {
+        return Promise.reject(new Error("Missing text hash."));
+      }
+      return loadResult(message.hash);
+    case "pangram-save-result":
+      if (typeof message.hash !== "string" || !TEXT_HASH.test(message.hash)) {
+        return Promise.reject(new Error("Missing text hash."));
+      }
+      if (!message.saved || typeof message.saved !== "object") {
+        return Promise.reject(new Error("Missing result to save."));
+      }
+      return saveResult(message.hash, message.saved);
     case "open-options":
       return chrome.runtime.openOptionsPage().then(function () {
         return {};

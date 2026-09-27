@@ -147,8 +147,14 @@ the rest. From each roster name (display name, sortable name, short name):
 - A capitalized name part that is also a common word is replaced too (in a
   course with a student named He, "He grew up…" becomes "[name] grew up…").
 
-Results are kept only until the page reloads. The check always reads the
-student's latest attempt.
+Each result is saved in this browser, under a SHA-256 hash of the
+submission's text: all of its files joined, before names are replaced and
+before any edit. When you prepare a submission whose text has a saved result,
+the box shows that result and the time of the check, and nothing is sent.
+**Check again** (or **Send to Pangram again**) in **Details** always makes a
+new check, and its result replaces the saved one. The check always reads the
+student's latest attempt, so a new attempt with new text gets a new check.
+**Delete saved results** on the options page removes them all.
 
 **Setup:** make an API key in your Pangram account, then open the extension's
 **Details → Extension options** on `chrome://extensions` and save the key. It
@@ -262,8 +268,11 @@ is stored only in this browser. Each check uses Pangram API credits.
   finishes. The key stays in `chrome.storage.local`, which the worker limits
   to extension pages; the options page (`src/options/`) saves or removes it.
   The **Send without preview** setting is one flag in `chrome.storage.sync`.
-  Check results stay in the content script's memory, per assignment and
-  student, until the page reloads.
+  Each finished check is saved in `chrome.storage.local` through the worker
+  (the content script cannot reach that area), as
+  `pangramResult:<SHA-256 of the joined text>`: Pangram's result, the
+  replacement counts, and the time of the check. The `unlimitedStorage`
+  permission lifts that area's 10 MB limit.
 
 The Canvas features send only same-origin requests to the Canvas site you are
 on (`canvas.rice.edu` or `hq.globaltech.org`) using your existing session

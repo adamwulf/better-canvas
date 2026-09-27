@@ -8,7 +8,7 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "permissions": ["storage"],
+  "permissions": ["storage", "unlimitedStorage"],
   "host_permissions": ["https://text.external-api.pangram.com/*"],
   "background": {
     "service_worker": "src/background/service-worker.js"
