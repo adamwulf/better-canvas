@@ -110,9 +110,10 @@ submission details. **Check with Pangram** checks the student on screen with
    segment — and as a one-line summary in the grading panel.
 
 Name matching covers each roster name, its sortable form (`Doe, Jane`), its
-short name, each ordered pair of its capitalized words (`Jane Doe` for
-`Jane Q. Doe`, `Maria Garcia` for `Maria Garcia Lopez`), the surname from the
-sortable form (`van der Berg`), and each part of two or more letters (`Jane`,
+short name, its shorter forms (`Jane Doe` for `Jane Q. Doe`, `Maria Garcia`
+for `Maria Garcia Lopez`, `Maria Da Silva` for `Ana Maria Da Silva`; a
+particle such as `de` or `van` never makes a form on its own), the surname
+from the sortable form (`van der Berg`), and each part of two or more letters (`Jane`,
 `Doe`, the halves of `Mary-Jane`, a nickname such as `David` in
 `Wei (David) Zhang`). Accents and letters such as ł, ø, and ß are ignored in
 both directions, so a roster spelling of `Jose Nunez` also catches
