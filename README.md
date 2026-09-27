@@ -3,8 +3,8 @@
 A personal, unpacked Chrome extension with quality-of-life tweaks for
 [canvas.rice.edu](https://canvas.rice.edu) and
 [hq.globaltech.org](https://hq.globaltech.org) (a partner org's Canvas site that
-hosts a Rice course), plus study and photo-download tools on the Esther course
-roster. Built for personal use.
+hosts a Rice course), a Pangram AI-detection check in SpeedGrader, plus study
+and photo-download tools on the Esther course roster. Built for personal use.
 
 > The freeze-dry / Markdown "save this page" actions that used to live here have
 > moved to a separate, standalone extension.
@@ -91,6 +91,40 @@ fetched only from their existing roster URLs using the active Esther session;
 nothing is uploaded to a service or sent to a third party. Students without a
 photo and any failed downloads are reported after the remaining photos finish.
 
+### 7. Pangram AI check in SpeedGrader
+
+In SpeedGrader, a **Pangram** box appears in the grading panel under the
+submission details. **Check with Pangram** checks the student on screen with
+[Pangram](https://www.pangram.com)'s AI-detection API:
+
+1. The submission text is read in the browser: a text entry, or each PDF,
+   Word (`.docx`), or `.txt` file. Other files (images, old `.doc` files) are
+   listed as skipped. A scanned PDF with no text layer has no text to check.
+2. Every student name on the course roster is replaced with `[name]`, and
+   every email address with `[email]`.
+3. A dialog shows the exact redacted text, how many names and email addresses
+   were replaced, and the word count. **Nothing is sent until you click
+   Send to Pangram.**
+4. The result shows in the dialog — Pangram's verdict (AI / Mixed / Human),
+   the AI, AI-assisted, and human percentages, and the text colored by
+   segment — and as a one-line summary in the grading panel.
+
+Name matching covers each roster name, its sortable form (`Doe, Jane`), its
+short name, and each part of two or more letters (`Jane`, `Doe`, the halves
+of `Mary-Jane`), with or without accents. A match must be a whole word that
+starts with a capital letter (or be spelled exactly as on the roster), so
+ordinary lowercase words stay intact when a student is named Will, May, or
+Rose. A lowercase name inside an email address is covered because the whole
+address is replaced. Check the preview for any other form of a name (a
+nickname, a lowercase user name) before you send.
+
+Results are kept only until the page reloads. The check always reads the
+student's latest attempt.
+
+**Setup:** make an API key in your Pangram account, then open the extension's
+**Details → Extension options** on `chrome://extensions` and save the key. It
+is stored only in this browser. Each check uses Pangram API credits.
+
 ## How it works
 
 - **Favicon** — a content script (`src/favicon/favicon.js`, `document_start`)
@@ -164,11 +198,44 @@ photo and any failed downloads are reported after the remaining photos finish.
   and ZIP logic are all in that one file; its styling is in
   `src/flashcards/flashcards.css`.
 
+- **Pangram check** — a content script (`src/speedgrader/pangram.js`, on
+  `/courses/*/gradebook/speed_grader*` only) adds its section after the last
+  submission-details block of the React SpeedGrader grading panel (the file
+  list, else the word count, else the "Submitted:" line), and a
+  `MutationObserver` keeps it there and in step with the `student_id` in the
+  URL as SpeedGrader switches students. The submission is shown in Canvas
+  DocViewer, a cross-origin iframe that draws each page, so the script does
+  not read the page. It asks Canvas for the submission instead
+  (`GET /api/v1/courses/:id/assignments/:id/submissions/:user_id?include[]=user`,
+  or `…/anonymous_submissions/:anonymous_id` for anonymous grading) and
+  downloads each attachment from its Canvas URL. `src/speedgrader/submission-text.js`
+  turns that into plain text: DOMParser for the text-entry HTML; for `.docx`,
+  a small ZIP reader plus the browser's `DecompressionStream` to get
+  `word/document.xml`, then a walk of its `w:t` runs (skipping deleted text,
+  field codes, and the duplicate fallback copy of text boxes); for `.pdf`,
+  the bundled [pdf.js](https://mozilla.github.io/pdf.js/) (`vendor/pdfjs`,
+  pdfjs-dist 6.3.289, loaded only when a PDF is checked, eval off, parsed on
+  the page thread because a worker from the extension would be cross-origin).
+  The roster comes from
+  `GET /api/v1/courses/:id/users?enrollment_type[]=student` (all enrollment
+  states, every page), and `src/lib/redact.js` replaces names and email
+  addresses. If the roster cannot load, the check stops and nothing is sent.
+  After you click **Send to Pangram**, the redacted text goes to the
+  background service worker (`src/background/service-worker.js`), which calls
+  `POST https://text.external-api.pangram.com/task` with the saved key and
+  then `GET /task/:id` once per content-script message until the task
+  finishes. The key stays in `chrome.storage.local`, which the worker limits
+  to extension pages; the options page (`src/options/`) saves or removes it.
+
 The Canvas features send only same-origin requests to the Canvas site you are
-on (`canvas.rice.edu` or `hq.globaltech.org`) using your existing session. The roster flashcards send no network requests at all;
-the face-photo downloader requests only the image URLs already present on the
-Esther roster, using your existing session. No feature contacts a third-party
-service.
+on (`canvas.rice.edu` or `hq.globaltech.org`) using your existing session
+(Canvas may redirect a file download to its own file store). The roster
+flashcards send no network requests at all; the face-photo downloader requests
+only the image URLs already present on the Esther roster, using your existing
+session. The one exception to "no third party" is the Pangram check: when you
+click **Send to Pangram**, and only then, the redacted text you see in the
+preview goes to Pangram's API. No student name, file, file name, or Canvas ID
+is sent with it.
 
 ## Install (load unpacked)
 
@@ -178,6 +245,8 @@ service.
 4. Open [canvas.rice.edu](https://canvas.rice.edu) or
    [hq.globaltech.org](https://hq.globaltech.org) and reload. For the roster
    tools, open your Esther class roster (`esther.rice.edu/selfserve/swkrost.main`).
+5. For the Pangram check, click **Details → Extension options** on the
+   extension card and save your Pangram API key.
 
 After editing any file, return to `chrome://extensions` and click the reload
 icon on the extension card, then reload the Canvas tab.
@@ -188,10 +257,12 @@ icon on the extension card, then reload the Canvas tab.
 manifest.json                   MV3 manifest
 icons/                          extension icons (16 / 48 / 128)
 assets/                         tab favicon PNGs (16 / 32 / 48)
+vendor/pdfjs/                   pdf.js 6.3.289 build + LICENSE (PDF text)
 src/
   favicon/favicon.js            swaps the tab favicon
   lib/terms.js                  term parsing (season/year/sub-term)
   lib/grouping.js               semester bucketing (next/current/previous/older)
+  lib/redact.js                 replaces roster names and emails in text
   dashboard/dashboard.js        builds the grouped course list
   dashboard/dashboard.css       list styling
   tray/course-tray.js           regroups the "Courses" sidebar tray
@@ -201,9 +272,19 @@ src/
   files/column-resize.css       handle styling + overflow scrolling
   flashcards/flashcards.js      flashcards + local face-photo ZIP download
   flashcards/flashcards.css     roster buttons + card/deck styling
+  speedgrader/pangram.js        SpeedGrader Pangram section + dialog
+  speedgrader/pangram.css       section + dialog styling
+  speedgrader/submission-text.js  text from text entries, PDF, DOCX, TXT
+  background/service-worker.js  holds the API key, calls the Pangram API
+  options/                      options page for the Pangram API key
 tests/
   face-photo-download.test.js   filename and ZIP-format tests
+  redact.test.js                name and email redaction tests
+  submission-text.test.js       file-type and DOCX ZIP-reader tests
 ```
+
+Run the tests with Node (`node tests/<name>.test.js`); the ZIP tests also use
+the system `zip` and `unzip` tools.
 
 ## Notes & next steps
 
