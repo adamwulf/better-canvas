@@ -125,7 +125,8 @@ the rest. From each roster name (display name, sortable name, short name):
   roster writes in lowercase (a particle such as `van` or `de`). A nickname in
   parentheses or quotes counts (`David` in `Wei (David) Zhang`).
 - Accents are ignored both ways (`Jose Nunez` = `José Núñez`), letters such as
-  ł, ø, ß are spelled out, and `ü` also matches `ue` (`Müller` = `Mueller`).
+  ł, ø, ß are spelled out, and an `ä`/`ö`/`ü` in a roster name also matches
+  `ae`/`oe`/`ue` in the text (`Müller` catches `Mueller`).
 - An apostrophe may be any apostrophe mark or left out (`OBrien`), a hyphen
   may be a space or left out (`Do Hyun`, `Dohyun`), and the words of a whole
   name may be joined by a hyphen, an underscore, or a dot (`jane_doe`).

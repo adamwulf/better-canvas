@@ -15,9 +15,10 @@
 //      Canvas login_id) with "[netid]", and every email address with
 //      "[email]" (BetterCanvasRedact). If the roster cannot load, the check
 //      stops here and nothing is sent.
-//   5. Show the redacted text in a dialog. Nothing leaves the browser until
-//      "Send to Pangram" is clicked.
-//   6. The background worker sends only that redacted text to Pangram and
+//   5. Show the redacted text in an editable box in a dialog, where the
+//      grader removes anything the rules missed. Nothing leaves the browser
+//      until "Send to Pangram" is clicked.
+//   6. The background worker sends only the text in that box to Pangram and
 //      the dialog shows the result, with the text colored by segment.
 //
 // SpeedGrader is a React app that switches students without a page load and
@@ -88,6 +89,10 @@
   function wordCount(text) {
     var words = text.match(/\S+/g);
     return words ? words.length : 0;
+  }
+
+  function wordsText(count) {
+    return "Words: " + count.toLocaleString();
   }
 
   function delay(ms) {
@@ -458,6 +463,14 @@
     }
     if (state.status === "error") {
       row.appendChild(el("span", "bc-pg-section-error", "Last check failed."));
+      if (state.preview) {
+        row.appendChild(button("Back to text", "bc-pg-primary", forStudent(target.key, function (current) {
+          update(state, { status: "ready" });
+          openDialog(current.key);
+        })));
+        row.appendChild(button("Start over", "", forStudent(target.key, prepare)));
+        return;
+      }
     }
     row.appendChild(button("Check with Pangram", "bc-pg-primary", forStudent(target.key, prepare)));
   }
@@ -518,6 +531,11 @@
     editor.setAttribute("aria-label", "Text to send to Pangram");
     editor.addEventListener("input", function () {
       preview.text = editor.value;
+      preview.words = wordCount(editor.value);
+      var words = dialog && dialog.body.querySelector(".bc-pg-words");
+      if (words) {
+        words.textContent = wordsText(preview.words);
+      }
     });
     return editor;
   }
@@ -583,7 +601,7 @@
         "NetIDs: Canvas did not share the roster's login IDs, so NetIDs were not replaced"));
     }
     list.appendChild(el("li", "", "Email addresses replaced: " + preview.emails));
-    list.appendChild(el("li", "", "Words: " + preview.words.toLocaleString()));
+    list.appendChild(el("li", "bc-pg-words", wordsText(preview.words)));
     list.appendChild(el("li", "", "From: " + preview.sources.join(", ")));
     preview.skipped.forEach(function (item) {
       list.appendChild(el("li", "bc-pg-skipped", "Skipped: " + item));
@@ -649,6 +667,12 @@
     }
     if (state.status === "error") {
       body.appendChild(el("p", "bc-pg-error", state.error));
+      if (state.preview) {
+        // A failed send keeps the edited text; go back to it to try again.
+        footer.appendChild(button("Back to text", "bc-pg-primary", function () {
+          update(state, { status: "ready" });
+        }));
+      }
       if (state.needsKey) {
         footer.appendChild(button("Open options", "bc-pg-primary", function () {
           sendMessage({ type: "open-options" }).catch(function (err) {

@@ -1,7 +1,7 @@
 // Better Canvas (Rice) — background service worker: Pangram API calls
 //
 // The SpeedGrader Pangram check (src/speedgrader/pangram.js) sends its
-// already-redacted text here, and this worker calls the Pangram AI-detection
+// redacted (and grader-reviewed) text here, and this worker calls the Pangram AI-detection
 // API with the key saved on the options page. The key never leaves this
 // worker: content scripts can only ask whether a key exists.
 //
