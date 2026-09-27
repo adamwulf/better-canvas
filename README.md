@@ -104,70 +104,33 @@ submission details. **Check with Pangram** checks the student on screen with
    roster NetID (the Canvas login ID, such as `jd45`; for a login ID in email
    form, its part before the `@`) with `[netid]`, and every email address
    with `[email]`.
-3. A dialog shows the exact redacted text, how many names, NetIDs, and email
-   addresses were replaced, and the word count. **Nothing is sent until you
-   click Send to Pangram.** If Canvas does not share the roster's login IDs
-   with you, the dialog says that NetIDs were not replaced.
+3. A dialog shows the redacted text in an editable box, with how many names,
+   NetIDs, and email addresses were replaced. Read it and remove anything the
+   rules missed. **Nothing is sent until you click Send to Pangram**, and what
+   is sent is exactly what the box holds. If Canvas does not share the
+   roster's login IDs with you, the dialog says that NetIDs were not replaced.
 4. The result shows in the dialog — Pangram's verdict (AI / Mixed / Human),
    the AI, AI-assisted, and human percentages, and the text colored by
    segment — and as a one-line summary in the grading panel.
 
-Name matching covers each roster name, its sortable form (`Doe, Jane Q.`),
-the surname-first forms without the comma (`Doe Jane Q`, and the surname,
-or each part of a compound or particle surname, with each given word:
-`Doe Jane`, `Kim Grace` for `Kim, Seoyeon Grace`, `Garcia Maria` for
-`Garcia-Lopez, Maria`, `Cruz Sofia` for `de la Cruz, Sofia`), its
-short name, its shorter forms (`Jane Doe` for `Jane Q. Doe`, `Maria Garcia`
-for `Maria Garcia Lopez`, `Ana da Silva` for `Ana Maria Da Silva`, `Kevin Le`
-for `Kevin Minh Le`, `Ana García` for `Ana García-López`; a particle such as
-`de` or `van` joins a form only with the word it belongs to), the surname
-from the sortable form (`van der Berg`), and each part of two or more letters
-(`Jane`, `Doe`, the halves of `Mary-Jane`, a nickname such as `David` in
-`Wei (David) Zhang`) except a particle that the roster writes in lowercase
-inside the name, such as the `van` of `Anna van der Berg` or the `al` of
-`Omar al-Farsi` (a capitalized one, such as the `Le` of `Jia Le Chen`, is
-kept, since it can be a real name syllable). A hyphen in a name also matches
-a space or nothing, so `Do-Hyun Kim` catches `Do Hyun Kim` and `Dohyun Kim`,
-and `Smith-Jones` catches a lowercase `smith jones` (only when each half has
-3 or more letters, so `In-Young` never turns the phrase `in young` into a
-name). Accents and letters such as
-ł, ø, and ß are ignored in both directions, so a roster spelling of
-`Jose Nunez` also catches `José Núñez`, and `Müller` also catches `Mueller`
-(and the reverse). Full-width letters and ligatures are read as plain
-letters, the ʻokina, an acute accent, and a backtick count as an apostrophe
-(`O´Brien`), an apostrophe may be left out
-(`OBrien` for `O'Brien`), and the words of a whole name (and the halves of a
-hyphenated one) may be joined by an underscore, a dot, or nothing
-(`Jane_Doe`, `jane.doe`, `maria_garcia_lopez`, `JaneDoe`, `@janedoe`,
-`DeLaCruz`, `Jimin` for `Ji Min Park`). Two neighboring name words joined
-into one word are also caught when capitalized (`Subin` for `Su Bin Park`,
-`Xiaole` for `Xiao Le Wang`); in lowercase that form falls under the
-lowercase-single-name rule below. A whole name joined in all lowercase is
-always replaced in a path, URL, file name, or handle (any non-space run with
-`@ / \ _ =` or a dot between letters or digits: `/Users/seoyeon/`,
-`@liwei`, `maryjane-essay.pdf`, `?user=seoyeon`) or next to a digit
-(`liwei2026`). In prose it needs 6 or more letters (so `anle` is not taken
-for a word), and it may not be just the two halves of one hyphenated name,
-which may be an ordinary word (`wanting` for `Wan-Ting`); `Wanting` with a
-capital is always replaced. A short surname-first join (under 6 letters)
-with only its first letter capitalized may also be an English word (`Like`
-for `Li, Ke`, `Human` for `Hu, Man`, also in an all-caps heading), so in
-prose it is replaced only in CamelCase (`LiKe`). A name may touch a digit (`@JaneDoe2026`,
-`janedoe99`), except a single-word name of fewer than 4 letters, which next
-to a digit is more likely a formula or a code (`Li2O` for a student named
-Li). A whole
-name (two or more words) matches in any case, such as `jane doe`. A single
-word must have a capital letter (`Doe`, `DOE`, `deWitt`) or be in a script
-with no letter case, so ordinary lowercase words stay intact when a student
-is named Will, May, or Rose, or has a particle such as `de` or `al` in their
-name; suffixes such as `Jr` and `III` are never replaced alone. Privacy comes
-first: a name part that is also a common capitalized word (`He` or `An` as a
-surname, `In` or `Do` as a name syllable) is replaced wherever it is
-capitalized, so in a course with a student named He, a sentence that starts
-"He grew up…" also becomes "[name] grew up…". A lowercase
-name inside an email address is covered because the whole address is
-replaced. The preview dialog reminds you to read the text for any other form
-of a name (a lowercase nickname or user name) before you send.
+Name matching aims at the usual forms of a name; the editable preview is for
+the rest. From each roster name (display name, sortable name, short name):
+
+- **Whole names match in any case:** the full name, the sortable name without
+  its comma (`Doe Jane Q`), and every pair of its main words in either order
+  (`Jane Doe`, `Doe Jane`).
+- **Single name words must be capitalized in the text** (`Jane`, `Doe`, and
+  each half of `Mary-Jane`), so ordinary lowercase words (`will`, `may`) stay.
+- A main word has 2+ letters and is not a suffix (`Jr`, `III`) or a word the
+  roster writes in lowercase (a particle such as `van` or `de`). A nickname in
+  parentheses or quotes counts (`David` in `Wei (David) Zhang`).
+- Accents are ignored both ways (`Jose Nunez` = `José Núñez`), letters such as
+  ł, ø, ß are spelled out, and `ü` also matches `ue` (`Müller` = `Mueller`).
+- An apostrophe may be any apostrophe mark or left out (`OBrien`), a hyphen
+  may be a space or left out (`Do Hyun`, `Dohyun`), and the words of a whole
+  name may be joined by a hyphen, an underscore, or a dot (`jane_doe`).
+- A capitalized name part that is also a common word is replaced too (in a
+  course with a student named He, "He grew up…" becomes "[name] grew up…").
 
 Results are kept only until the page reloads. The check always reads the
 student's latest attempt.
@@ -290,9 +253,9 @@ on (`canvas.rice.edu` or `hq.globaltech.org`) using your existing session
 flashcards send no network requests at all; the face-photo downloader requests
 only the image URLs already present on the Esther roster, using your existing
 session. The one exception to "no third party" is the Pangram check: when you
-click **Send to Pangram**, and only then, the redacted text you see in the
-preview goes to Pangram's API. No student name, file, file name, or Canvas ID
-is sent with it.
+click **Send to Pangram**, and only then, the text in the preview box (as you
+left it) goes to Pangram's API. No file, file name, or Canvas ID is sent with
+it.
 
 ## Install (load unpacked)
 

@@ -174,13 +174,19 @@
   background: #fbfbfd;
   font: 13px/1.55 ui-serif, Georgia, "Times New Roman", serif;
 }
-.bc-pg-dialog mark.bc-pg-redacted {
-  padding: 0 2px;
-  border-radius: 3px;
-  background: #dfe7f3;
-  color: #2b5586;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
+/* The editable preview: the same look, as a full-width text box. */
+.bc-pg-dialog textarea.bc-pg-editor {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: 45vh;
+  margin: 0;
+  resize: vertical;
+  color: #1f2430;
+}
+.bc-pg-dialog textarea.bc-pg-editor:focus {
+  outline: 2px solid #2b5586;
+  outline-offset: 1px;
 }
 
 /* ---- Result -------------------------------------------------------------- */

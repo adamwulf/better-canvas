@@ -388,6 +388,7 @@
         });
     }
 
+    // The editor's current text, as the grader left it.
     sendMessage({ type: "pangram-create-task", text: state.preview.text })
       .then(function (value) {
         return poll(value.taskId);
@@ -506,17 +507,19 @@
     return "bc-pg-seg-human";
   }
 
-  // The redacted text, with each [name], [netid], and [email] mark highlighted.
-  function previewText(text) {
-    var box = el("div", "bc-pg-text");
-    text.split(/(\[name\]|\[netid\]|\[email\])/).forEach(function (part) {
-      if (part === Redact.NAME_MARK || part === Redact.ID_MARK || part === Redact.EMAIL_MARK) {
-        box.appendChild(el("mark", "bc-pg-redacted", part));
-      } else if (part) {
-        box.appendChild(document.createTextNode(part));
-      }
+  // The redacted text in an editor, so the grader can remove anything the
+  // rules missed. Edits go straight into the preview state (not through
+  // update(), which would redraw the dialog and reset the editor), and "Send
+  // to Pangram" sends exactly what the editor holds.
+  function previewEditor(preview) {
+    var editor = el("textarea", "bc-pg-text bc-pg-editor");
+    editor.value = preview.text;
+    editor.spellcheck = false;
+    editor.setAttribute("aria-label", "Text to send to Pangram");
+    editor.addEventListener("input", function () {
+      preview.text = editor.value;
     });
-    return box;
+    return editor;
   }
 
   // Pangram's returned text, colored by the label of each window. Windows may
@@ -602,13 +605,13 @@
       return;
     }
     if (state.status === "ready") {
-      var netIdText = state.preview.idsKnown ? ", their NetIDs with [netid]," : "";
-      body.appendChild(el("p", "", "This is the exact text that will go to Pangram. Student names from " +
-        "the course roster are replaced with [name]" + netIdText + " and email addresses with [email]. " +
-        "Lowercase names, user names, and nicknames that are not on the roster are not replaced, so read " +
-        "the text before you send it. Nothing has been sent yet."));
+      var netIdText = state.preview.idsKnown ? ", NetIDs with [netid]," : "";
+      body.appendChild(el("p", "", "This text goes to Pangram when you click Send. Roster names are " +
+        "replaced with [name]" + netIdText + " and email addresses with [email]. The rules catch the " +
+        "usual forms of a name, not every one: read the text and edit it to remove anything they missed. " +
+        "Nothing has been sent yet."));
       body.appendChild(facts(state.preview));
-      body.appendChild(previewText(state.preview.text));
+      body.appendChild(previewEditor(state.preview));
       footer.appendChild(button("Cancel", "", function () {
         update(state, { status: "idle", preview: null });
         closeDialog();
