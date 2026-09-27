@@ -500,9 +500,9 @@
     // a name when it is part of a path, URL, file name, or handle
     // ("/Users/seoyeon/", "@liwei", "maryjane_essay.pdf") or touches a digit
     // ("liwei2026"), or when it has a capital ("JaneDoe", "Jimin" for "Ji
-    // Min") -- except that a short surname-first join with a single capital
-    // may be an English word ("Like" for "Li, Ke", "Human" for "Hu, Man"), so
-    // it needs a second capital ("LiKe"). In lowercase prose it needs 6+
+    // Min") -- except that a short surname-first join may be an English word
+    // ("Like" for "Li, Ke", "Human" for "Hu, Man", also in an all-caps
+    // heading), so it needs CamelCase ("LiKe"). In lowercase prose it needs 6+
     // letters ("janedoe", "delacruz"), so a short join ("anle" for "An Le")
     // is not taken for a word, and it may not be just the two halves of one
     // hyphenated name, which may be an ordinary word ("wanting" for
@@ -518,7 +518,9 @@
       }
       var key = fold(match).toLowerCase();
       if (capitalized(match)) {
-        return !terms.reversedShort[key] || (match.match(/\p{Lu}/gu) || []).length >= 2;
+        // CamelCase means a capital after a lowercase letter ("LiKe"); an
+        // all-caps heading ("LIKE WATER FOR CHOCOLATE") is not.
+        return !terms.reversedShort[key] || /\p{Ll}\p{Lu}/u.test(match);
       }
       return letterCount(match) >= JOINED_MIN_LETTERS && !terms.joinedHalves[key];
     }

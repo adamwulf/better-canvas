@@ -112,8 +112,9 @@ submission details. **Check with Pangram** checks the student on screen with
    the AI, AI-assisted, and human percentages, and the text colored by
    segment — and as a one-line summary in the grading panel.
 
-Name matching covers each roster name, its sortable form (`Doe, Jane`, and
-the same without the comma, `Doe Jane`, for names written surname first), its
+Name matching covers each roster name, its sortable form (`Doe, Jane Q.`),
+the surname-first forms without the comma (`Doe Jane Q`, and the surname
+with each given word: `Doe Jane`, `Kim Grace` for `Kim, Seoyeon Grace`), its
 short name, its shorter forms (`Jane Doe` for `Jane Q. Doe`, `Maria Garcia`
 for `Maria Garcia Lopez`, `Ana da Silva` for `Ana Maria Da Silva`, `Kevin Le`
 for `Kevin Minh Le`, `Ana García` for `Ana García-López`; a particle such as
@@ -148,8 +149,8 @@ for a word), and it may not be just the two halves of one hyphenated name,
 which may be an ordinary word (`wanting` for `Wan-Ting`); `Wanting` with a
 capital is always replaced. A short surname-first join (under 6 letters)
 with only its first letter capitalized may also be an English word (`Like`
-for `Li, Ke`, `Human` for `Hu, Man`), so in prose it is replaced only in
-CamelCase (`LiKe`). A name may touch a digit (`@JaneDoe2026`,
+for `Li, Ke`, `Human` for `Hu, Man`, also in an all-caps heading), so in
+prose it is replaced only in CamelCase (`LiKe`). A name may touch a digit (`@JaneDoe2026`,
 `janedoe99`), except a single-word name of fewer than 4 letters, which next
 to a digit is more likely a formula or a code (`Li2O` for a student named
 Li). A whole

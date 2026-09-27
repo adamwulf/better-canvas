@@ -448,6 +448,7 @@ var reversedWords = Redact.createRedactor(["Ke Li", "Li, Ke", "Man Hu", "Hu, Man
 [
   ["Like many students, I agree.", "Like many students, I agree."],
   ["Human rights matter. Lean on me. Wuhan is a city.", "Human rights matter. Lean on me. Wuhan is a city."],
+  ["LIKE WATER FOR CHOCOLATE; HUMAN RIGHTS", "LIKE WATER FOR CHOCOLATE; HUMAN RIGHTS"],
   ["LiKe and HuMan wrote", "[name] and [name] wrote"],
   ["li ke and Ke Li wrote", "[name] and [name] wrote"],
   ["follow @like2026", "follow @[name]2026"]
