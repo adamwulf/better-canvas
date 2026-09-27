@@ -24,17 +24,54 @@
   font-weight: 700;
   line-height: 1.3;
 }
+/* After a check, a light tint for the winning category, as light as the grey. */
+.bc-pg-section.bc-pg-tint-ai {
+  border-color: #efcdc9;
+  background: #fef4f3;
+}
+.bc-pg-section.bc-pg-tint-assisted {
+  border-color: #eadcb1;
+  background: #fdf8e9;
+}
+.bc-pg-section.bc-pg-tint-human {
+  border-color: #c8e0cf;
+  background: #f1f8f3;
+}
 .bc-pg-section-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
-.bc-pg-summary {
+.bc-pg-section-row + .bc-pg-section-row {
+  margin-top: 6px;
+}
+.bc-pg-step-number {
+  min-width: 1.2em;
   font-weight: 600;
 }
+.bc-pg-scores {
+  margin: 0 0 6px;
+}
+.bc-pg-winner {
+  font-weight: 700;
+}
 .bc-pg-section-error {
+  margin: 0 0 6px;
   color: #b3261e;
+}
+.bc-pg-section .bc-pg-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: 400;
+  color: #5a6475;
+  cursor: pointer;
+}
+.bc-pg-section .bc-pg-option input {
+  margin: 0;
 }
 
 /* ---- Buttons ------------------------------------------------------------- */
@@ -63,6 +100,12 @@
 }
 .bc-pg-button.bc-pg-primary:hover {
   background: #244a75;
+}
+.bc-pg-button:disabled,
+.bc-pg-button:disabled:hover {
+  background: #fff;
+  opacity: 0.5;
+  cursor: default;
 }
 .bc-pg-button.bc-pg-link {
   padding: 0;
@@ -141,9 +184,6 @@
 }
 .bc-pg-busy {
   font-weight: 600;
-}
-.bc-pg-note {
-  color: #5a6475;
 }
 .bc-pg-error {
   color: #b3261e;

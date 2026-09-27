@@ -94,8 +94,9 @@ photo and any failed downloads are reported after the remaining photos finish.
 ### 7. Pangram AI check in SpeedGrader
 
 In SpeedGrader, a **Pangram** box appears in the grading panel under the
-submission details. **Check with Pangram** checks the student on screen with
-[Pangram](https://www.pangram.com)'s AI-detection API:
+submission details. It checks the student on screen with
+[Pangram](https://www.pangram.com)'s AI-detection API in two steps:
+**1. Prepare text for Pangram** and **2. Send to Pangram**.
 
 1. The submission text is read in the browser: a text entry, or each PDF,
    Word (`.docx`), or `.txt` file. Other files (images, old `.doc` files) are
@@ -109,9 +110,17 @@ submission details. **Check with Pangram** checks the student on screen with
    rules missed. **Nothing is sent until you click Send to Pangram**, and what
    is sent is exactly what the box holds. If Canvas does not share the
    roster's login IDs with you, the dialog says that NetIDs were not replaced.
-4. The result shows in the dialog — Pangram's verdict (AI / Mixed / Human),
-   the AI, AI-assisted, and human percentages, and the text colored by
-   segment — and as a one-line summary in the grading panel.
+   Close the dialog to keep the text; **Review text** opens it again.
+4. **Send to Pangram** (in the dialog or in the box) closes the dialog. The
+   box shows the progress, then Pangram's verdict and the AI, AI-assisted,
+   and human percentages, one per line, with the largest in bold. The box
+   turns light red, yellow, or green for the largest. **Details** opens the
+   full result, with the text colored by segment.
+
+Check **Send without preview** to skip the review: the box then shows only
+**Send to Pangram**, which reads, redacts, and sends the text in one go, with
+no dialog. Names, NetIDs, and email addresses are still replaced. The
+setting is saved in Chrome's synced extension storage.
 
 Name matching aims at the usual forms of a name; the editable preview is for
 the rest. From each roster name (display name, sortable name, short name):
@@ -247,6 +256,9 @@ is stored only in this browser. Each check uses Pangram API credits.
   then `GET /task/:id` once per content-script message until the task
   finishes. The key stays in `chrome.storage.local`, which the worker limits
   to extension pages; the options page (`src/options/`) saves or removes it.
+  The **Send without preview** setting is one flag in `chrome.storage.sync`.
+  Check results stay in the content script's memory, per assignment and
+  student, until the page reloads.
 
 The Canvas features send only same-origin requests to the Canvas site you are
 on (`canvas.rice.edu` or `hq.globaltech.org`) using your existing session
@@ -254,9 +266,10 @@ on (`canvas.rice.edu` or `hq.globaltech.org`) using your existing session
 flashcards send no network requests at all; the face-photo downloader requests
 only the image URLs already present on the Esther roster, using your existing
 session. The one exception to "no third party" is the Pangram check: when you
-click **Send to Pangram**, and only then, the text in the preview box (as you
-left it) goes to Pangram's API. No file, file name, or Canvas ID is sent with
-it.
+click **Send to Pangram**, and only then, the redacted text goes to Pangram's
+API — as you left it in the preview box, or straight from redaction with
+**Send without preview** checked. No file, file name, or Canvas ID is sent
+with it.
 
 ## Install (load unpacked)
 
