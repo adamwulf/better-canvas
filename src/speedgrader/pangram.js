@@ -89,8 +89,8 @@
   }
 
   // The second click of a double-click is ignored: the first click often
-  // opens the dialog or swaps its buttons, and the second would then land on
-  // the backdrop or on a new button (such as "Close" where "Send" was).
+  // opens or closes the dialog or redraws the section, and the second would
+  // then land on the backdrop or on a new button.
   function button(label, className, onClick) {
     var node = el("button", "bc-pg-button " + (className || ""), label);
     node.type = "button";

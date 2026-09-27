@@ -64,6 +64,9 @@
   margin: 0 0 6px;
   color: #b3261e;
 }
+.bc-pg-busy {
+  font-weight: 600;
+}
 .bc-pg-section .bc-pg-option {
   display: flex;
   align-items: center;
@@ -185,9 +188,6 @@
   gap: 8px;
   padding: 12px 18px;
   border-top: 1px solid #e3e6ec;
-}
-.bc-pg-busy {
-  font-weight: 600;
 }
 
 .bc-pg-dialog .bc-pg-facts {
