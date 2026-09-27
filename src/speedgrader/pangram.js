@@ -45,14 +45,14 @@
 // (which keeps that area from content scripts), under the SHA-256 hash of the
 // text from step 3: the submission's joined text before redaction and before
 // any edit in the dialog. Preparing a text with a saved result shows that
-// result and sends nothing. When a student's section first shows and any
-// result is saved, steps 1-3 run by themselves to look for that student's
-// saved result, so a submission already checked shows its result with no
-// click; with none, the section stays at step 1 and keeps the text for
-// "Prepare text for Pangram". "Check again" (or "Send to Pangram again")
-// always sends a new check, and its result replaces the saved one. A saved
-// result holds Pangram's answer (with the redacted text Pangram scored), the
-// facts shown with it, and the time of the check.
+// result and sends nothing. Each time a student comes up with an idle
+// section and any result is saved, steps 1-3 run by themselves to look for
+// that student's saved result, so a submission already checked shows its
+// result with no click; with none, the section stays at step 1 and keeps the
+// text for "Prepare text for Pangram" during that visit. "Check again" (or
+// "Send to Pangram again") always sends a new check, and its result replaces
+// the saved one. A saved result holds Pangram's answer (with the redacted
+// text Pangram scored), the facts shown with it, and the time of the check.
 
 (function () {
   "use strict";
@@ -88,6 +88,7 @@
   var rosterReady = null; // Promise<{ names, ids }>, loaded once per page
   var dialog = null; // { key, root, body, footer }
   var sendWithoutPreview = false;
+  var shownKey = ""; // the student last on screen
 
   // ---- Small helpers --------------------------------------------------------
 
@@ -463,13 +464,14 @@
     });
   }
 
-  // Looks for a saved result when a student's section first shows, so a
-  // submission already checked shows its result with no click. It reads the
-  // text but needs no key or roster, and nothing leaves the browser. It runs
-  // only when some result is saved, and only if the student is still on
-  // screen, so paging through students does not read every submission. With
-  // no saved result, the section goes back to step 1 and keeps the text it
-  // read for "Prepare text for Pangram", which also shows any error.
+  // Looks for a saved result each time a student comes up with an idle
+  // section, so a submission already checked shows its result with no click.
+  // It reads the text but needs no key or roster, and nothing leaves the
+  // browser. It runs only when some result is saved, and only if the student
+  // is still on screen, so paging through students does not read every
+  // submission. With no saved result, the section goes back to step 1 and
+  // keeps the text it read for "Prepare text for Pangram" during this visit;
+  // Prepare also shows any error.
   function lookup(target) {
     var state = stateFor(target.key);
     state.lookedUp = true;
@@ -482,8 +484,7 @@
         }
         var current = currentTarget();
         if (!current || current.key !== target.key) {
-          state.lookedUp = false; // look when the student is back on screen
-          return null;
+          return null; // renderSection() looks again when the student is back
         }
         if (!status.hasResults) {
           return null;
@@ -808,6 +809,16 @@
 
   function renderSection() {
     var target = currentTarget();
+    // Each time a student comes up, an idle section looks for a saved result
+    // again, so it reads the latest attempt, not text from an earlier visit.
+    if (target && target.key !== shownKey) {
+      shownKey = target.key;
+      var arrived = stateFor(target.key);
+      if (arrived.status === "idle") {
+        arrived.lookedUp = false;
+        arrived.read = null;
+      }
+    }
     var anchor = target && findAnchor();
     var section = document.querySelector("section[" + SECTION_MARK + "]");
     if (!anchor) {
