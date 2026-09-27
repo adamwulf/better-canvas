@@ -303,6 +303,7 @@ var variants = Redact.createRedactor([
   ["Ka'iulani wrote", "[name] wrote"],
   ["Kaiulani wrote", "[name] wrote"],
   ["Kaʻahanui wrote", "[name] wrote"],
+  ["Ka‘iulani and OʼBrien", "[name] and [name]"],
   ["Ｊａｎｅ Ｄｏｅ wrote", "[name] wrote"],
   ["Griﬃn wrote", "[name] wrote"],
   ["Jane_Doe_essay.pdf", "[name]_essay.pdf"],

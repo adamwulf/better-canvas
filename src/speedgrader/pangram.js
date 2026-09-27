@@ -602,10 +602,11 @@
       return;
     }
     if (state.status === "ready") {
+      var netIdText = state.preview.idsKnown ? ", their NetIDs with [netid]," : "";
       body.appendChild(el("p", "", "This is the exact text that will go to Pangram. Student names from " +
-        "the course roster are replaced with [name], their NetIDs with [netid], and email addresses with " +
-        "[email]. Lowercase names, user names, and nicknames that are not on the roster are not replaced, " +
-        "so read the text before you send it. Nothing has been sent yet."));
+        "the course roster are replaced with [name]" + netIdText + " and email addresses with [email]. " +
+        "Lowercase names, user names, and nicknames that are not on the roster are not replaced, so read " +
+        "the text before you send it. Nothing has been sent yet."));
       body.appendChild(facts(state.preview));
       body.appendChild(previewText(state.preview.text));
       footer.appendChild(button("Cancel", "", function () {
