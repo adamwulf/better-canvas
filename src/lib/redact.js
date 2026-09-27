@@ -154,20 +154,23 @@
 
   // The second common spelling of ä, ö, ü, å, and ø ("Müller" and "Mueller"),
   // both ways: a roster "Mueller" also gets "Muller", which is how the folded
-  // text spells "Müller".
+  // text spells "Müller". The reverse applies only to ae/oe/ue inside a word,
+  // and a made-up spelling needs four or more letters, so a roster "Doe",
+  // "Noe", or "Haas" never becomes the common word "Do", "No", or "Has".
   var DIGRAPHS = {
     "ä": "ae", "ö": "oe", "ü": "ue", "å": "aa", "ø": "oe",
     "Ä": "Ae", "Ö": "Oe", "Ü": "Ue", "Å": "Aa", "Ø": "Oe"
   };
+  var VARIANT_MIN_LETTERS = 4;
 
   function spellings(term) {
     var forms = [term];
     var digraphs = term.replace(/[äöüåøÄÖÜÅØ]/g, function (ch) {
       return DIGRAPHS[ch];
     });
-    var singles = term.replace(/([aouAOU])e|([aA])a/g, "$1$2");
+    var singles = term.replace(/(\p{L})([aouAOU])e(?=\p{L})/gu, "$1$2");
     [digraphs, singles].forEach(function (form) {
-      if (form !== term) {
+      if (form !== term && letterCount(form) >= VARIANT_MIN_LETTERS) {
         forms.push(form);
       }
     });

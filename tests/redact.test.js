@@ -94,6 +94,13 @@ check("Karl Müller", "[name]");
 check("Müller said", "[name] said");
 check("Soeren Holm", "[name]");
 
+// The reverse spelling never turns a roster name into a common word.
+var common = Redact.createRedactor(["John Doe", "Ana Noe", "Eva Haas", "Omar Saad", "Min Soe", "Joel Park"]);
+["Do you agree?", "No one came.", "Has it ended?", "Sad news.", "So it goes.", "Jol"].forEach(function (text) {
+  assert.strictEqual(common.redact(text).text, text, JSON.stringify(text));
+});
+assert.strictEqual(common.redact("Doe and Haas").text, "[name] and [name]");
+
 // Lowercase short forms of a longer roster name.
 check("john smith\nENTR 222", "[name]\nENTR 222");
 check("maria garcia wrote", "[name] wrote");
