@@ -16,8 +16,9 @@
 // pdf.js normally parses in a Web Worker. A worker made from a
 // chrome-extension:// URL is cross-origin to the Canvas page, so the worker
 // module is loaded first and set as globalThis.pdfjsWorker, which makes pdf.js
-// parse on this thread instead. Student PDFs are untrusted input, so eval is
-// off and XFA forms are not parsed.
+// parse on this thread instead. Student PDFs are untrusted input: pdf.js 6 has
+// no eval path (and the extension's content-script CSP blocks eval anyway),
+// XFA forms are not parsed, and a DOCX entry may not expand past 50 MB.
 //
 // Exposed as window.BetterCanvasSubmissionText so sibling content scripts can
 // use it.
@@ -28,6 +29,7 @@
   var DOCX_TYPE = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
   var W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
   var MC_NS = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+  var MAX_ENTRY_BYTES = 50 * 1024 * 1024;
 
   // ---- Shared ---------------------------------------------------------------
 
@@ -101,18 +103,50 @@
 
   // ---- DOCX -----------------------------------------------------------------
 
-  function inflateRaw(data) {
-    var stream = new Blob([data]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
-    return new Response(stream).arrayBuffer().then(function (buffer) {
-      return new Uint8Array(buffer);
-    });
+  function tooLarge() {
+    return new Error("the document text is too large to read");
+  }
+
+  // Inflates raw DEFLATE data, but stops at maxBytes of output: a crafted
+  // file can say it is small in its header and still expand without limit.
+  function inflateRaw(data, maxBytes) {
+    var reader = new Blob([data]).stream()
+      .pipeThrough(new DecompressionStream("deflate-raw"))
+      .getReader();
+    var chunks = [];
+    var total = 0;
+
+    function pump() {
+      return reader.read().then(function (step) {
+        if (step.done) {
+          var out = new Uint8Array(total);
+          var offset = 0;
+          chunks.forEach(function (chunk) {
+            out.set(chunk, offset);
+            offset += chunk.length;
+          });
+          return out;
+        }
+        total += step.value.length;
+        if (total > maxBytes) {
+          reader.cancel();
+          throw tooLarge();
+        }
+        chunks.push(step.value);
+        return pump();
+      });
+    }
+
+    return pump();
   }
 
   // Returns the bytes of one file inside a ZIP, or null if the ZIP does not
   // have it. Reads the central directory (its sizes are right even when a
   // local header defers them to a data descriptor). ZIP64 is not supported;
-  // a Word document is far below its 4 GB limit.
-  function readZipEntry(bytes, wanted) {
+  // a Word document is far below its 4 GB limit. An entry larger than
+  // maxBytes (default 50 MB) once uncompressed is refused.
+  function readZipEntry(bytes, wanted, maxBytes) {
+    maxBytes = maxBytes || MAX_ENTRY_BYTES;
     return Promise.resolve().then(function () {
       var view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
       var end = -1;
@@ -135,14 +169,18 @@
         }
         var method = view.getUint16(offset + 10, true);
         var size = view.getUint32(offset + 20, true);
+        var fullSize = view.getUint32(offset + 24, true);
         var nameLength = view.getUint16(offset + 28, true);
         var extraLength = view.getUint16(offset + 30, true);
         var commentLength = view.getUint16(offset + 32, true);
         var local = view.getUint32(offset + 42, true);
         var name = decoder.decode(bytes.subarray(offset + 46, offset + 46 + nameLength));
         if (name === wanted) {
-          if (size === 0xffffffff || local === 0xffffffff) {
+          if (size === 0xffffffff || fullSize === 0xffffffff || local === 0xffffffff) {
             throw new Error("ZIP64 archives are not supported");
+          }
+          if (size > maxBytes || fullSize > maxBytes) {
+            throw tooLarge();
           }
           if (view.getUint32(local, true) !== 0x04034b50) {
             throw new Error("the ZIP entry is damaged");
@@ -153,7 +191,7 @@
             return data;
           }
           if (method === 8) {
-            return inflateRaw(data);
+            return inflateRaw(data, maxBytes);
           }
           throw new Error("unsupported ZIP compression method " + method);
         }
@@ -253,7 +291,6 @@
     return loadPdfjs().then(function (pdfjs) {
       var task = pdfjs.getDocument({
         data: new Uint8Array(buffer),
-        isEvalSupported: false,
         enableXfa: false,
         disableFontFace: true
       });

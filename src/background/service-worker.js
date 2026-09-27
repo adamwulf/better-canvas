@@ -21,12 +21,15 @@ var API_BASE = "https://text.external-api.pangram.com";
 var KEY_NAME = "pangramApiKey";
 
 // Every message waits for this, so the area is locked before the SpeedGrader
-// script hears back and goes on to parse a student file.
+// script hears back and goes on to parse a student file. If the lock fails,
+// every message fails too: the check stays off rather than run unprotected.
 var storageLocked = chrome.storage.local
   .setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" })
   .catch(function (err) {
     console.warn("[BetterCanvas] could not restrict storage access", err);
+    throw new Error("The extension could not protect the saved API key, so the Pangram check is off.");
   });
+storageLocked.catch(function () {}); // reported to each message instead
 
 function loadKey() {
   return chrome.storage.local.get(KEY_NAME).then(function (items) {

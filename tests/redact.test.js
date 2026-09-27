@@ -14,8 +14,12 @@ var redactor = Redact.createRedactor([
   "Jane Q. Doe", "Doe, Jane Q.", "Janie Doe",
   "Mary-Jane O'Brien", "O'Brien, Mary-Jane",
   "José Núñez", "Núñez, José",
-  "Will May",
+  "Will May", "May, Will",
   "Anna van der Berg", "van der Berg, Anna",
+  "Omar al-Farsi", "al-Farsi, Omar",
+  "Maria de la Cruz", "de la Cruz, Maria",
+  "John Smith III", "Smith, John III",
+  "Soren Kjaer", "Łukasz Wójcik", "İlayda Yıldız", "Anna Strauß", "Chloe Lefevre",
   "X Y"
 ]);
 
@@ -46,13 +50,33 @@ check("José Núñez", "[name]");
 check("José Núñez", "[name]");
 check("Jose Nunez", "[name]");
 
-// Common words that are also names stay intact when lowercase.
-check("Will may go. May will stay.", "[name] may go. [name] will stay.");
+// The other direction: the roster has no accents, the paper does.
+check("Chloé Lefèvre wrote this.", "[name] wrote this.");
+check("Søren Kjær", "[name]");
+
+// Letters that NFD does not split, in both directions.
+check("Soren Kjaer", "[name]");
+check("Lukasz Wojcik", "[name]");
+check("ŁUKASZ WÓJCIK", "[name]");
+check("Ilayda YILDIZ", "[name]");
+check("Yildiz and Strauss", "[name] and [name]");
+check("Anna Strauss", "[name]");
+
+// Whole names match in any case; single words must be capitalized.
+check("jane doe\nENTR 222", "[name]\nENTR 222", { names: 1, emails: 0 });
+check("Will may go. May will stay.", "[name] go. [name] will stay.");
 check("you will see", "you will see", { names: 0, emails: 0 });
 
-// Lowercase roster spellings still match exactly as written.
+// Surnames with particles match as a whole, in any case.
 check("Anna van der Berg", "[name]");
 check("interviewed van der Berg", "interviewed [name]");
+check("Omar al-Farsi and al-Farsi's plan", "[name] and [name]'s plan");
+check("De la Cruz said", "[name] said");
+
+// Lowercase particles and suffixes are not names on their own.
+check("Smith et al. (2020) found", "[name] et al. (2020) found");
+check("de facto, a la carte, drove the van", "de facto, a la carte, drove the van", { names: 0, emails: 0 });
+check("World War III and Part II", "World War III and Part II", { names: 0, emails: 0 });
 
 // A name inside another word does not match.
 check("Janet and Doering", "Janet and Doering", { names: 0, emails: 0 });
@@ -62,9 +86,10 @@ check("X marks the spot, Y not?", "X marks the spot, Y not?");
 
 // Email addresses go first, so a lowercase name inside one is gone too.
 check("Contact jane.doe@rice.edu today", "Contact [email] today", { names: 0, emails: 1 });
-check("jd45@rice.edu, Jane Doe", "[email], [name]", { names: 2, emails: 1 });
+check("jd45@rice.edu, Jane Doe", "[email], [name]", { names: 1, emails: 1 });
 
-// Lines and paragraphs are kept.
+// A whole name may wrap to the next line; paragraphs are kept.
+check("by Jane\nDoe today", "by [name] today", { names: 1, emails: 0 });
 check("Jane\n\nDoe", "[name]\n\n[name]");
 
 // An empty roster changes nothing but email addresses.

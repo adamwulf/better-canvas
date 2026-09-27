@@ -110,13 +110,18 @@ submission details. **Check with Pangram** checks the student on screen with
    segment — and as a one-line summary in the grading panel.
 
 Name matching covers each roster name, its sortable form (`Doe, Jane`), its
-short name, and each part of two or more letters (`Jane`, `Doe`, the halves
-of `Mary-Jane`), with or without accents. A match must be a whole word that
-starts with a capital letter (or be spelled exactly as on the roster), so
-ordinary lowercase words stay intact when a student is named Will, May, or
-Rose. A lowercase name inside an email address is covered because the whole
-address is replaced. Check the preview for any other form of a name (a
-nickname, a lowercase user name) before you send.
+short name, its first and last word (`Jane Doe` for `Jane Q. Doe`), the
+surname from the sortable form (`van der Berg`), and each part of two or more
+letters (`Jane`, `Doe`, the halves of `Mary-Jane`). Accents and letters such
+as ł, ø, and ß are ignored in both directions, so a roster spelling of
+`Jose Nunez` also catches `José Núñez`. A whole name (two or more words)
+matches in any case, such as `jane doe`. A single word must start with a
+capital letter, so ordinary lowercase words stay intact when a student is
+named Will, May, or Rose, or has a particle such as `de` or `al` in their
+name; suffixes such as `Jr` and `III` are never replaced alone. A lowercase
+name inside an email address is covered because the whole address is
+replaced. Check the preview for any other form of a name (a lowercase
+nickname or user name) before you send.
 
 Results are kept only until the page reloads. The check always reads the
 student's latest attempt.
@@ -214,8 +219,9 @@ is stored only in this browser. Each check uses Pangram API credits.
   `word/document.xml`, then a walk of its `w:t` runs (skipping deleted text,
   field codes, and the duplicate fallback copy of text boxes); for `.pdf`,
   the bundled [pdf.js](https://mozilla.github.io/pdf.js/) (`vendor/pdfjs`,
-  pdfjs-dist 6.3.289, loaded only when a PDF is checked, eval off, parsed on
-  the page thread because a worker from the extension would be cross-origin).
+  pdfjs-dist 6.3.289, loaded only when a PDF is checked, parsed on the page
+  thread because a worker from the extension would be cross-origin). A `.docx`
+  whose document text would expand past 50 MB is refused.
   The roster comes from
   `GET /api/v1/courses/:id/users?enrollment_type[]=student` (all enrollment
   states, every page), and `src/lib/redact.js` replaces names and email

@@ -79,15 +79,47 @@ function localFlags(bytes) {
 assert.strictEqual(localFlags(descriptors) & 0x0008, 0x0008, "-fd writes a data descriptor");
 assert.strictEqual(localFlags(deflated) & 0x0008, 0, "a plain zip has no data descriptor");
 
+// The central-directory record for word/document.xml in a ZIP.
+function directoryEntry(bytes) {
+  var view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  var end = bytes.length - 22;
+  while (view.getUint32(end, true) !== 0x06054b50) {
+    end--;
+  }
+  var offset = view.getUint32(end + 16, true);
+  for (var n = 0; n < view.getUint16(end + 10, true); n++) {
+    var nameLength = view.getUint16(offset + 28, true);
+    var name = Buffer.from(bytes.subarray(offset + 46, offset + 46 + nameLength)).toString();
+    if (name === "word/document.xml") {
+      return { view: view, offset: offset, compressed: view.getUint32(offset + 20, true) };
+    }
+    offset += 46 + nameLength + view.getUint16(offset + 30, true) + view.getUint16(offset + 32, true);
+  }
+  throw new Error("no word/document.xml");
+}
+
+// A copy that claims its document is 10 bytes once uncompressed.
+var lying = new Uint8Array(deflated);
+var lyingEntry = directoryEntry(lying);
+lyingEntry.view.setUint32(lyingEntry.offset + 24, 10, true);
+var limit = lyingEntry.compressed + 1; // passes the header checks, not the stream
+
+function errorOf(promise) {
+  return promise.then(
+    function () { return "no error"; },
+    function (err) { return err.message; }
+  );
+}
+
 Promise.all([
   entryText(deflated, "word/document.xml"),
   entryText(stored, "word/document.xml"),
   entryText(descriptors, "word/document.xml"),
   entryText(deflated, "word/missing.xml"),
-  SubmissionText.readZipEntry(new Uint8Array(64), "word/document.xml").then(
-    function () { return "no error"; },
-    function (err) { return err.message; }
-  )
+  errorOf(SubmissionText.readZipEntry(new Uint8Array(64), "word/document.xml")),
+  errorOf(SubmissionText.readZipEntry(deflated, "word/document.xml", 100)),
+  errorOf(SubmissionText.readZipEntry(lying, "word/document.xml", limit)),
+  entryText(lying, "word/document.xml")
 ])
   .then(function (results) {
     assert.strictEqual(results[0], documentXml, "deflated entry");
@@ -95,6 +127,9 @@ Promise.all([
     assert.strictEqual(results[2], documentXml, "entry with a data descriptor");
     assert.strictEqual(results[3], null, "missing entry");
     assert.strictEqual(results[4], "the file is not a ZIP archive");
+    assert.strictEqual(results[5], "the document text is too large to read", "size in the header");
+    assert.strictEqual(results[6], "the document text is too large to read", "size while inflating");
+    assert.strictEqual(results[7], documentXml, "under the default limit");
     console.log("Submission text tests passed.");
   })
   .catch(function (err) {
