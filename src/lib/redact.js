@@ -406,8 +406,20 @@
     );
   }
 
+  // True when text[start, end) touches a path, URL, file-name, or handle
+  // character: @ / \ or _ before it, / \ or _ after it, or a dot that joins
+  // it to a letter or digit ("seoyeon.kim", "seoyeon.2026").
+  function inPathOrHandle(text, start, end) {
+    var before = text[start - 1] || "";
+    var after = text[end] || "";
+    return /[@\/\\_]/.test(before) || /[\/\\_]/.test(after) ||
+      (before === "." && /[\p{L}\p{N}]/u.test(text[start - 2] || "")) ||
+      (after === "." && /[\p{L}\p{N}]/u.test(text[end + 1] || ""));
+  }
+
   // Replaces each match of pattern (run on the folded text) that accept()
-  // allows, judged on the original spelling. Returns the new text and count.
+  // allows, judged on the original spelling and its place in the text.
+  // Returns the new text and count.
   function replaceTerms(text, pattern, accept) {
     if (!pattern) {
       return { text: text, count: 0 };
@@ -421,7 +433,7 @@
     while ((match = pattern.exec(folded.folded)) !== null) {
       var start = folded.map[match.index];
       var end = folded.map[match.index + match[0].length];
-      if (accept(text.slice(start, end))) {
+      if (accept(text.slice(start, end), text, start)) {
         out += text.slice(last, start) + NAME_MARK;
         last = end;
         count++;
@@ -443,16 +455,21 @@
 
     // A whole name matches in any case. Written with no space at all, it is
     // a name when it has a capital ("JaneDoe", "Jimin" for "Ji Min") or, in
-    // lowercase, when it has 6+ letters ("janedoe", "delacruz") -- unless it
-    // is just the two halves of one hyphenated name, which may be an
-    // ordinary word ("wanting" for "Wan-Ting"). A short lowercase join
-    // ("anle" for "An Le") is not taken for a name either.
-    function wholeName(match) {
+    // lowercase, when it has 6+ letters ("janedoe", "delacruz"); a short
+    // lowercase join ("anle" for "An Le") is not taken for a name. The two
+    // halves of one hyphenated name joined in lowercase may be an ordinary
+    // word in prose ("wanting" for "Wan-Ting"), so that form is taken only in
+    // a path, URL, file name, or handle ("/Users/seoyeon/", "@annemarie",
+    // "maryjane_essay.pdf").
+    function wholeName(match, text, start) {
       if (/[\s\-‐‑_.'’]/.test(match) || capitalized(match)) {
         return true;
       }
-      return letterCount(match) >= JOINED_MIN_LETTERS &&
-        !terms.joinedHalves[fold(match).toLowerCase()];
+      if (letterCount(match) < JOINED_MIN_LETTERS) {
+        return false;
+      }
+      return !terms.joinedHalves[fold(match).toLowerCase()] ||
+        inPathOrHandle(text, start, start + match.length);
     }
 
     // NFC here too, so composed and decomposed accents in the text fold the

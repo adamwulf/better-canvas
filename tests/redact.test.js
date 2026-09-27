@@ -348,12 +348,31 @@ var joined = Redact.createRedactor([
   ["Subin and SuBin", "[name] and [name]"],
   ["Jiale and JiaLe", "[name] and [name]"],
   ["Wanting to help, Wanting agreed.", "[name] to help, [name] agreed."],
-  // A lowercase join that is only a hyphenated name's halves may be a word.
+  // A lowercase join that is only a hyphenated name's halves may be a word
+  // in prose, but is a name in a path, URL, file name, or handle.
   ["I was wanting more.", "I was wanting more."],
+  ["see wanting_list.txt", "see [name]_list.txt"],
   ["the anle of it", "the anle of it"],
   ["Vander Waals", "Vander Waals"]
 ].forEach(function (pair) {
   assert.strictEqual(joined.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
+});
+
+// The lowercase joined form of a hyphenated given name in paths, URLs, file
+// names, and handles.
+var handles = Redact.createRedactor(["Seo-Yeon Kim", "Jean-Luc Picard", "Anne-Marie Roy", "Mary-Jane Watson"]);
+[
+  ["/Users/seoyeon/Desktop/essay.docx", "/Users/[name]/Desktop/essay.docx"],
+  ["C:\\Users\\seoyeon\\notes", "C:\\Users\\[name]\\notes"],
+  ["github.com/jeanluc/project", "github.com/[name]/project"],
+  ["follow @annemarie", "follow @[name]"],
+  ["maryjane_essay.pdf", "[name]_essay.pdf"],
+  ["seoyeon.kim.2026", "[name].2026"], // the whole name, joined by a dot
+  ["seoyeon.2026", "[name].2026"],
+  // In prose, a lowercase one-word form stays, like other lowercase names.
+  ["seoyeon said so", "seoyeon said so"]
+].forEach(function (pair) {
+  assert.strictEqual(handles.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
 });
 
 // An empty roster changes nothing but email addresses.
