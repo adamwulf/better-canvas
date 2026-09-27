@@ -36,8 +36,8 @@
   var EMAIL_MARK = "[email]";
   var MIN_LETTERS = 2;
   var SUFFIX = /^(?:jr|sr|ii|iii|iv)$/i;
-  var PARTICLE = /^(?:al|bin|ibn|da|das|de|del|della|den|der|di|do|dos|du|el|la|las|le|les|lo|los|ten|ter|van|von|zu)$/i;
-  var MAX_MAIN_WORDS = 5;
+  var PARTICLE = /^(?:al|bin|ibn|da|das|de|del|della|den|der|di|do|dos|du|el|het|la|las|le|les|lo|los|op|ten|ter|van|vom|von|zu|zum|zur)$/i;
+  var MAX_UNITS = 5;
 
   // Letters, combining marks, and digits make up a word. A name match may not
   // touch one of these on either side.
@@ -136,48 +136,80 @@
     return /\p{Lu}/u.test(word) || !/[\p{Lu}\p{Ll}\p{Lt}]/u.test(word);
   }
 
-  // The shorter forms of a name that a student often writes in a paper. The
-  // main words are the capitalized ones that are not particles; initials and
-  // suffixes are left out. The forms are:
-  //   - every ordered group of two or more main words: "Jane Doe" for
-  //     "Jane Q. Doe", "John Smith" for "John Smith III", "María García
-  //     López" for "María José García López", "David Zhang" for
-  //     "Wei (David) Zhang" (only pairs for a name with more than 5 main
-  //     words, to keep the term list small);
-  //   - every run of the name's own words that starts and ends on a main
-  //     word, so particles inside it stay: "Maria Da Silva" for
-  //     "Ana Maria Da Silva".
-  // A particle is never part of a group on its own, so "de la" or "van der"
-  // in a paper is never taken for a name.
-  function shortForms(name) {
-    var words = name.split(PART_SPLIT).map(trimEdges).filter(function (word) {
+  // The words of a name (in first-last order), without initials or suffixes.
+  function nameWords(name) {
+    return name.split(PART_SPLIT).map(trimEdges).filter(function (word) {
       return letterCount(word) >= MIN_LETTERS && !SUFFIX.test(word);
     });
-    function isMain(word) {
-      return capitalized(word) && !PARTICLE.test(word);
-    }
-    var main = words.filter(isMain);
+  }
+
+  // A name as units: each word that is not a particle, with the particles
+  // just before it ("de la Cruz", "Da Silva", "dos Santos"). A particle that
+  // is the first word ("Van" in "Van Nguyen", "Le" in "Le Thi Hoa") or has no
+  // word after it ("Le" in "Minh Anh Le") is a real name, so it is its own
+  // unit. Each half of a hyphenated word is a unit too, right after the whole
+  // word, so "Ana García" comes from "Ana García-López". "full" keeps a
+  // unit's particles; "bare" drops them.
+  function nameUnits(words) {
+    var units = [];
+    var pending = [];
+    words.forEach(function (word, index) {
+      if (index > 0 && PARTICLE.test(word)) {
+        pending.push(word);
+        return;
+      }
+      units.push({ full: pending.concat(word).join(" "), bare: word });
+      pending = [];
+      var halves = word.split(/[-‐‑]/);
+      if (halves.length > 1) {
+        halves.forEach(function (half) {
+          if (letterCount(half) >= MIN_LETTERS && !PARTICLE.test(half)) {
+            units.push({ full: half, bare: half });
+          }
+        });
+      }
+    });
+    pending.forEach(function (word) {
+      units.push({ full: word, bare: word });
+    });
+    return units;
+  }
+
+  // The shorter forms of a name that a student often writes in a paper:
+  //   - each unit that has particles: "de la Cruz";
+  //   - every ordered group of two or more units, with and without their
+  //     particles: "Jane Doe" for "Jane Q. Doe", "John Smith" for "John Smith
+  //     III", "María García López" for "María José García López", "Sofia de
+  //     la Cruz" and "Sofia Cruz" for "Sofia Maria de la Cruz", "Anh Le" for
+  //     "Minh Anh Le", "David Zhang" for "Wei (David) Zhang" (only pairs past
+  //     5 units, to keep the term list small).
+  // A particle joins a group only with the word it belongs to, so "de la" or
+  // "van der" alone in a paper is never taken for a name.
+  function shortForms(name) {
+    var units = nameUnits(nameWords(name));
     var forms = [];
-    if (main.length <= MAX_MAIN_WORDS) {
-      for (var mask = 1; mask < (1 << main.length); mask++) {
-        var group = main.filter(function (word, index) {
+    units.forEach(function (unit) {
+      if (unit.full !== unit.bare) {
+        forms.push(unit.full);
+      }
+    });
+    function addGroup(group) {
+      forms.push(group.map(function (unit) { return unit.full; }).join(" "));
+      forms.push(group.map(function (unit) { return unit.bare; }).join(" "));
+    }
+    if (units.length <= MAX_UNITS) {
+      for (var mask = 1; mask < (1 << units.length); mask++) {
+        var group = units.filter(function (unit, index) {
           return mask & (1 << index);
         });
         if (group.length >= 2) {
-          forms.push(group.join(" "));
+          addGroup(group);
         }
       }
     } else {
-      for (var a = 0; a < main.length; a++) {
-        for (var b = a + 1; b < main.length; b++) {
-          forms.push(main[a] + " " + main[b]);
-        }
-      }
-    }
-    for (var i = 0; i < words.length; i++) {
-      for (var j = i + 2; j < words.length && isMain(words[i]); j++) {
-        if (isMain(words[j])) {
-          forms.push(words.slice(i, j + 1).join(" "));
+      for (var a = 0; a < units.length; a++) {
+        for (var b = a + 1; b < units.length; b++) {
+          addGroup([units[a], units[b]]);
         }
       }
     }
@@ -186,9 +218,10 @@
 
   // The second common spelling of ä, ö, ü, å, and ø ("Müller" and "Mueller"),
   // both ways: a roster "Mueller" also gets "Muller", which is how the folded
-  // text spells "Müller". The reverse applies only to ae/oe/ue inside a word,
-  // and a made-up spelling needs four or more letters, so a roster "Doe",
-  // "Noe", or "Haas" never becomes the common word "Do", "No", or "Has".
+  // text spells "Müller" ("Oezdemir" gets "Ozdemir" the same way). The reverse
+  // applies only to ae/oe/ue with a letter after it, and a made-up spelling
+  // needs four or more letters, so a roster "Doe", "Noe", or "Haas" never
+  // becomes the common word "Do", "No", or "Has".
   var DIGRAPHS = {
     "ä": "ae", "ö": "oe", "ü": "ue", "å": "aa", "ø": "oe",
     "Ä": "Ae", "Ö": "Oe", "Ü": "Ue", "Å": "Aa", "Ø": "Oe"
@@ -200,7 +233,7 @@
     var digraphs = term.replace(/[äöüåøÄÖÜÅØ]/g, function (ch) {
       return DIGRAPHS[ch];
     });
-    var singles = term.replace(/(\p{L})([aouAOU])e(?=\p{L})/gu, "$1$2");
+    var singles = term.replace(/([aouAOU])e(?=\p{L})/gu, "$1");
     [digraphs, singles].forEach(function (form) {
       if (form !== term && letterCount(form) >= VARIANT_MIN_LETTERS) {
         forms.push(form);
@@ -237,9 +270,22 @@
       add(ordered);
       add(surname(name));
       shortForms(ordered).forEach(add);
-      name.split(PART_SPLIT).forEach(function (part) {
-        add(part);
-        part.split(/[-‐‑]/).forEach(add);
+      // Single words. A particle inside the name ("van" in "Anna van der
+      // Berg") or as half of a hyphenated name ("al" in "al-Farsi") does not
+      // identify anyone on its own, so it is not a term; as the first or last
+      // word it can be a real given name or surname ("Van Nguyen",
+      // "Minh Anh Le"), so it is.
+      var words = nameWords(ordered);
+      words.forEach(function (word, index) {
+        var edge = index === 0 || index === words.length - 1;
+        if (edge || !PARTICLE.test(word)) {
+          add(word);
+        }
+        word.split(/[-‐‑]/).forEach(function (half) {
+          if (!PARTICLE.test(half)) {
+            add(half);
+          }
+        });
       });
     });
     return { whole: whole, single: single };

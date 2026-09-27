@@ -121,6 +121,52 @@ var long = Redact.createRedactor([
   assert.strictEqual(long.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
 });
 
+// Particle units: a surname that is a particle, a particle surname after a
+// skipped middle name, a first-word particle, and hyphen halves.
+var units = Redact.createRedactor([
+  "Kevin Minh Le", "Le, Kevin Minh",
+  "Thanh Van Do",
+  "Priya Lakshmi Das",
+  "Sofia Maria de la Cruz", "Cruz, Sofia Maria de la",
+  "Ana Maria Da Silva", "Silva, Ana Maria Da",
+  "Mohamed Ali El Sayed",
+  "Pedro Luis dos Santos",
+  "Le Thi Hoa",
+  "Ana García-López",
+  "Emre Oezdemir", "Oeyvind Berg"
+]);
+[
+  ["kevin le wrote", "[name] wrote"],
+  ["thanh do wrote", "[name] wrote"],
+  ["priya das wrote", "[name] wrote"],
+  ["sofia de la cruz\nHIST 101", "[name]\nHIST 101"],
+  ["ana da silva wrote", "[name] wrote"],
+  ["mohamed el sayed wrote", "[name] wrote"],
+  ["pedro dos santos wrote", "[name] wrote"],
+  ["De La Cruz argues", "[name] argues"],
+  ["le hoa wrote", "[name] wrote"],
+  ["ana garcía wrote", "[name] wrote"],
+  ["Ana López wrote", "[name] wrote"],
+  ["Özdemir 1", "[name] 1"],
+  ["Øyvind Berg", "[name]"]
+].forEach(function (pair) {
+  assert.strictEqual(units.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
+});
+
+// A particle inside a roster name, or as half of a hyphenated name, is not a
+// name on its own.
+var particles = Redact.createRedactor([
+  "Anna van der Berg", "Omar al-Farsi", "Maria de la Cruz", "Juan del Toro",
+  "Ana de los Santos", "Maria do Carmo Silva", "Hans zu Berg"
+]);
+[
+  "Van Gogh painted it.", "Al Gore lost in 2000.", "La Niña years are dry.",
+  "Del Mar is north.", "Los Angeles is big.", "Do you agree?", "De facto, it failed.",
+  "Der Spiegel wrote.", "Al-Qaeda claimed it.", "Zu viel."
+].forEach(function (text) {
+  assert.strictEqual(particles.redact(text).text, text, JSON.stringify(text));
+});
+
 // The index map handles multi-unit folds, surrogate pairs, and combining
 // marks that NFC cannot compose.
 check("Strauß's essay", "[name]'s essay");
