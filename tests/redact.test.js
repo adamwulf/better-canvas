@@ -443,6 +443,18 @@ var middle = Redact.createRedactor(["Jane Q. Doe", "Doe, Jane Q.", "Seoyeon Grac
   assert.strictEqual(middle.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
 });
 
+// A short surname-first join in Title Case may be an English word.
+var reversedWords = Redact.createRedactor(["Ke Li", "Li, Ke", "Man Hu", "Hu, Man", "An Le", "Le, An", "Han Wu", "Wu, Han"]);
+[
+  ["Like many students, I agree.", "Like many students, I agree."],
+  ["Human rights matter. Lean on me. Wuhan is a city.", "Human rights matter. Lean on me. Wuhan is a city."],
+  ["LiKe and HuMan wrote", "[name] and [name] wrote"],
+  ["li ke and Ke Li wrote", "[name] and [name] wrote"],
+  ["follow @like2026", "follow @[name]2026"]
+].forEach(function (pair) {
+  assert.strictEqual(reversedWords.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
+});
+
 // An empty roster changes nothing but email addresses.
 var empty = Redact.createRedactor([]);
 assert.strictEqual(empty.termCount, 0);

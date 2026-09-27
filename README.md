@@ -146,7 +146,10 @@ always replaced in a path, URL, file name, or handle (any non-space run with
 (`liwei2026`). In prose it needs 6 or more letters (so `anle` is not taken
 for a word), and it may not be just the two halves of one hyphenated name,
 which may be an ordinary word (`wanting` for `Wan-Ting`); `Wanting` with a
-capital is always replaced. A name may touch a digit (`@JaneDoe2026`,
+capital is always replaced. A short surname-first join (under 6 letters)
+with only its first letter capitalized may also be an English word (`Like`
+for `Li, Ke`, `Human` for `Hu, Man`), so in prose it is replaced only in
+CamelCase (`LiKe`). A name may touch a digit (`@JaneDoe2026`,
 `janedoe99`), except a single-word name of fewer than 4 letters, which next
 to a digit is more likely a formula or a code (`Li2O` for a student named
 Li). A whole

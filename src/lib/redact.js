@@ -319,11 +319,13 @@
   }
 
   // Folded terms, split into whole names (with a space) and single words,
-  // plus the lowercase joined halves of hyphenated names (see wholeName).
+  // plus two sets of lowercase joined keys that wholeName() treats with care:
+  // the halves of hyphenated names, and short surname-first names.
   function collectTerms(names) {
     var whole = Object.create(null);
     var single = Object.create(null);
     var joinedHalves = Object.create(null);
+    var reversedShort = Object.create(null);
 
     // plain: skip the second spellings (see spellings), for a term made by
     // joining two words, where an ae/oe/ue across the join is no umlaut.
@@ -350,13 +352,22 @@
       add(ordered);
       // Surname first, no comma: "Kim Seoyeon Grace", and the surname with
       // each given word ("Kim Seoyeon", "Doe Jane" for "Doe, Jane Q.").
-      add(name.replace(/\s*,\s*/, " "));
+      var reversed = [name.replace(/\s*,\s*/, " ")];
       var last = surname(name);
       if (last) {
         nameWords(name.slice(name.indexOf(",") + 1)).forEach(function (given) {
-          add(last + " " + given);
+          reversed.push(last + " " + given);
         });
       }
+      reversed.forEach(function (form) {
+        add(form);
+        // Joined, a short one may be an English word ("Like" for "Li, Ke",
+        // "Human" for "Hu, Man"); wholeName() treats it with care.
+        var key = fold(tidy(form)).replace(/[^\p{L}\p{N}]/gu, "").toLowerCase();
+        if (letterCount(key) < JOINED_MIN_LETTERS) {
+          reversedShort[key] = true;
+        }
+      });
       add(last);
       shortForms(ordered).forEach(add);
       // Single words. A lowercase particle inside the name ("van" in "Anna van
@@ -399,7 +410,7 @@
         }
       });
     });
-    return { whole: whole, single: single, joinedHalves: joinedHalves };
+    return { whole: whole, single: single, joinedHalves: joinedHalves, reversedShort: reversedShort };
   }
 
   // One regex for a set of terms, longest first, so "Mary-Jane" wins over
@@ -486,15 +497,18 @@
     var netIds = idRegExp(idList);
 
     // A whole name matches in any case. Written with no space at all, it is
-    // a name when it has a capital ("JaneDoe", "Jimin" for "Ji Min"), or when
-    // it is part of a path, URL, file name, or handle ("/Users/seoyeon/",
-    // "@liwei", "maryjane_essay.pdf") or touches a digit ("liwei2026"). In
-    // lowercase prose it needs 6+ letters ("janedoe", "delacruz"), so a short
-    // join ("anle" for "An Le") is not taken for a word, and it may not be
-    // just the two halves of one hyphenated name, which may be an ordinary
-    // word ("wanting" for "Wan-Ting").
+    // a name when it is part of a path, URL, file name, or handle
+    // ("/Users/seoyeon/", "@liwei", "maryjane_essay.pdf") or touches a digit
+    // ("liwei2026"), or when it has a capital ("JaneDoe", "Jimin" for "Ji
+    // Min") -- except that a short surname-first join with a single capital
+    // may be an English word ("Like" for "Li, Ke", "Human" for "Hu, Man"), so
+    // it needs a second capital ("LiKe"). In lowercase prose it needs 6+
+    // letters ("janedoe", "delacruz"), so a short join ("anle" for "An Le")
+    // is not taken for a word, and it may not be just the two halves of one
+    // hyphenated name, which may be an ordinary word ("wanting" for
+    // "Wan-Ting").
     function wholeName(match, text, start) {
-      if (/[\s\-‐‑_.'’]/.test(match) || capitalized(match)) {
+      if (/[\s\-‐‑_.'’]/.test(match)) {
         return true;
       }
       var end = start + match.length;
@@ -502,8 +516,11 @@
           /\p{N}/u.test(text[start - 1] || "") || /\p{N}/u.test(text[end] || "")) {
         return true;
       }
-      return letterCount(match) >= JOINED_MIN_LETTERS &&
-        !terms.joinedHalves[fold(match).toLowerCase()];
+      var key = fold(match).toLowerCase();
+      if (capitalized(match)) {
+        return !terms.reversedShort[key] || (match.match(/\p{Lu}/gu) || []).length >= 2;
+      }
+      return letterCount(match) >= JOINED_MIN_LETTERS && !terms.joinedHalves[key];
     }
 
     // NFC here too, so composed and decomposed accents in the text fold the
