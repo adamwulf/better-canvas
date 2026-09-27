@@ -7,16 +7,17 @@
 //
 //   1. Ask the background worker whether a Pangram API key is saved.
 //   2. Load the submission (GET /api/v1/courses/:id/assignments/:id/
-//      submissions/:user_id) and every student on the course roster
-//      (GET /api/v1/courses/:id/users?enrollment_type[]=student).
+//      submissions/:user_id).
 //   3. Turn the submission into plain text in the browser: the text-entry
 //      body, or each PDF, Word (.docx), or .txt file
 //      (BetterCanvasSubmissionText), joined into one text. If a result is
-//      saved for that text, show it and stop here (see below).
-//   4. Replace every roster name with "[name]", every roster NetID (the
-//      Canvas login_id) with "[netid]", and every email address with
-//      "[email]" (BetterCanvasRedact). If the roster cannot load, the check
-//      stops here and nothing is sent.
+//      saved for that text, show it and stop here (see below); showing it
+//      needs no API key and no roster. Otherwise, with no key, stop here.
+//   4. Load every student on the course roster (GET /api/v1/courses/:id/
+//      users?enrollment_type[]=student), and replace every roster name with
+//      "[name]", every roster NetID (the Canvas login_id) with "[netid]", and
+//      every email address with "[email]" (BetterCanvasRedact). If the
+//      roster cannot load, the check stops here and nothing is sent.
 //   5. Show "Text prepared" in the section. No dialog opens by itself:
 //      "Details" opens the redacted text in an editable box in a dialog,
 //      where the grader removes anything the rules missed. Nothing leaves
@@ -430,23 +431,19 @@
   function prepare(target, thenSend, recheck) {
     var state = stateFor(target.key);
     update(state, { status: "preparing", error: "", needsKey: false, result: null, preview: null, hash: "", checkedAt: 0 });
-    var roster, submission, extracted, hash;
+    var hasKey, submission, extracted, hash;
 
     // The key check runs first: it also starts the background worker, which
     // locks the key away from content scripts before any student file is
-    // parsed here.
+    // parsed here. A missing key stops only a new check, after the saved
+    // result lookup, because showing a saved result needs no key.
     sendMessage({ type: "pangram-status" })
       .then(function (status) {
-        if (!status.hasKey) {
-          var err = new Error("Add your Pangram API key on the extension options page first.");
-          err.needsKey = true;
-          throw err;
-        }
-        return Promise.all([loadRoster(), loadSubmission(target)]);
+        hasKey = status.hasKey;
+        return loadSubmission(target);
       })
       .then(function (loaded) {
-        roster = loaded[0];
-        submission = loaded[1];
+        submission = loaded;
         return submissionText(submission);
       })
       .then(function (found) {
@@ -471,30 +468,39 @@
             preview: saved.preview,
             checkedAt: saved.checkedAt
           });
-          return;
+          return null;
         }
-        var names = roster.names.concat(userNames(submission.user));
-        var ids = roster.ids.concat(userIds(submission.user));
-        var redactor = Redact.createRedactor(names, ids);
-        var redacted = redactor.redact(extracted.text);
-        update(state, {
-          status: "ready",
-          attempt: submission.attempt,
-          hash: hash,
-          preview: {
-            text: redacted.text,
-            names: redacted.names,
-            ids: redacted.ids,
-            idsKnown: redactor.idCount > 0,
-            emails: redacted.emails,
-            words: wordCount(redacted.text),
-            sources: extracted.sources,
-            skipped: extracted.skipped
+        if (!hasKey) {
+          var err = new Error("Add your Pangram API key on the extension options page first.");
+          err.needsKey = true;
+          throw err;
+        }
+        // Only a new check needs the roster, so a saved result still shows
+        // when the roster cannot load.
+        return loadRoster().then(function (roster) {
+          var names = roster.names.concat(userNames(submission.user));
+          var ids = roster.ids.concat(userIds(submission.user));
+          var redactor = Redact.createRedactor(names, ids);
+          var redacted = redactor.redact(extracted.text);
+          update(state, {
+            status: "ready",
+            attempt: submission.attempt,
+            hash: hash,
+            preview: {
+              text: redacted.text,
+              names: redacted.names,
+              ids: redacted.ids,
+              idsKnown: redactor.idCount > 0,
+              emails: redacted.emails,
+              words: wordCount(redacted.text),
+              sources: extracted.sources,
+              skipped: extracted.skipped
+            }
+          });
+          if (thenSend) {
+            send(state);
           }
         });
-        if (thenSend) {
-          send(state);
-        }
       })
       .catch(function (err) {
         update(state, { status: "error", error: errorText(err), needsKey: !!err.needsKey });
