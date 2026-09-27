@@ -133,9 +133,16 @@ var units = Redact.createRedactor([
   "Pedro Luis dos Santos",
   "Le Thi Hoa",
   "Ana García-López",
+  "Juan Carlos Andres Garcia-Lopez",
   "Emre Oezdemir", "Oeyvind Berg"
 ]);
 [
+  ["As Das notes", "As [name] notes"],
+  ["Do argued", "[name] argued"],
+  ["sofia cruz wrote", "[name] wrote"],
+  ["ana silva wrote", "[name] wrote"],
+  ["juan carlos garcia-lopez wrote", "[name] wrote"],
+  ["juan garcia wrote", "[name] wrote"],
   ["kevin le wrote", "[name] wrote"],
   ["thanh do wrote", "[name] wrote"],
   ["priya das wrote", "[name] wrote"],

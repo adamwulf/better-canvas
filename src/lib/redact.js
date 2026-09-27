@@ -40,7 +40,7 @@
   var MIN_LETTERS = 2;
   var SUFFIX = /^(?:jr|sr|ii|iii|iv)$/i;
   var PARTICLE = /^(?:al|bin|ibn|da|das|de|del|della|den|der|di|do|dos|du|el|het|la|las|le|les|lo|los|op|ten|ter|van|vom|von|zu|zum|zur)$/i;
-  var MAX_UNITS = 5;
+  var MAX_SLOTS = 5;
 
   // Letters, combining marks, and digits make up a word. A name match may not
   // touch one of these on either side.
@@ -153,77 +153,84 @@
     });
   }
 
-  // A name as units: each word that is not a particle, with the particles
-  // just before it ("de la Cruz", "Da Silva", "dos Santos"). A particle that
-  // is the first word ("Van" in "Van Nguyen", "Le" in "Le Thi Hoa") or has no
-  // word after it ("Le" in "Minh Anh Le") is a real name, so it is its own
-  // unit. Each half of a hyphenated word is a unit too, right after the whole
-  // word, so "Ana García" comes from "Ana García-López" -- except a lowercase
-  // particle half ("al" in "al-Farsi"). "full" keeps a unit's particles;
-  // "bare" drops them.
-  function nameUnits(words) {
-    var units = [];
+  // A name as slots, one for each word that is not a particle, holding the
+  // units that word can stand for. The first unit is the word with the
+  // particles just before it ("de la Cruz", "Da Silva", "dos Santos"); a
+  // hyphenated word also has a unit for each half ("García" and "López" for
+  // "García-López"), except a lowercase particle half ("al" in "al-Farsi"). A
+  // particle that is the first word ("Van" in "Van Nguyen", "Le" in "Le Thi
+  // Hoa") or has no word after it ("Le" in "Minh Anh Le") is a real name, so
+  // it gets its own slot. "full" keeps a unit's particles; "bare" drops them.
+  function nameSlots(words) {
+    var slots = [];
     var pending = [];
     words.forEach(function (word, index) {
       if (index > 0 && PARTICLE.test(word)) {
         pending.push(word);
         return;
       }
-      units.push({ full: pending.concat(word).join(" "), bare: word });
+      var slot = [{ full: pending.concat(word).join(" "), bare: word }];
       pending = [];
       var halves = word.split(/[-‐‑]/);
       if (halves.length > 1) {
         halves.forEach(function (half) {
           if (letterCount(half) >= MIN_LETTERS && !lowercaseParticle(half)) {
-            units.push({ full: half, bare: half });
+            slot.push({ full: half, bare: half });
           }
         });
       }
+      slots.push(slot);
     });
     pending.forEach(function (word) {
-      units.push({ full: word, bare: word });
+      slots.push([{ full: word, bare: word }]);
     });
-    return units;
+    return slots;
+  }
+
+  // Every ordered group of two or more slots, with one unit from each: all
+  // groups for up to MAX_SLOTS slots, only pairs past that (to keep the term
+  // list small).
+  function slotGroups(slots) {
+    var groups = [];
+    function walk(index, group, pairsOnly) {
+      if (index === slots.length || (pairsOnly && group.length === 2)) {
+        if (group.length >= 2) {
+          groups.push(group);
+        }
+        return;
+      }
+      walk(index + 1, group, pairsOnly);
+      slots[index].forEach(function (unit) {
+        walk(index + 1, group.concat([unit]), pairsOnly);
+      });
+    }
+    walk(0, [], slots.length > MAX_SLOTS);
+    return groups;
   }
 
   // The shorter forms of a name that a student often writes in a paper:
   //   - each unit that has particles: "de la Cruz";
-  //   - every ordered group of two or more units, with and without their
+  //   - every group of units (see slotGroups), with and without their
   //     particles: "Jane Doe" for "Jane Q. Doe", "John Smith" for "John Smith
   //     III", "María García López" for "María José García López", "Sofia de
   //     la Cruz" and "Sofia Cruz" for "Sofia Maria de la Cruz", "Anh Le" for
-  //     "Minh Anh Le", "David Zhang" for "Wei (David) Zhang" (only pairs past
-  //     5 units, to keep the term list small).
+  //     "Minh Anh Le", "Ana García" for "Ana García-López", "David Zhang" for
+  //     "Wei (David) Zhang".
   // A particle joins a group only with the word it belongs to, so "de la" or
-  // "van der" alone in a paper is never taken for a name.
+  // "van der" alone in a paper is never taken for a name, and a group never
+  // holds a word together with its own half ("García-López García").
   function shortForms(name) {
-    var units = nameUnits(nameWords(name));
+    var slots = nameSlots(nameWords(name));
     var forms = [];
-    units.forEach(function (unit) {
-      if (unit.full !== unit.bare) {
-        forms.push(unit.full);
+    slots.forEach(function (slot) {
+      if (slot[0].full !== slot[0].bare) {
+        forms.push(slot[0].full);
       }
     });
-    function addGroup(group) {
+    slotGroups(slots).forEach(function (group) {
       forms.push(group.map(function (unit) { return unit.full; }).join(" "));
       forms.push(group.map(function (unit) { return unit.bare; }).join(" "));
-    }
-    if (units.length <= MAX_UNITS) {
-      for (var mask = 1; mask < (1 << units.length); mask++) {
-        var group = units.filter(function (unit, index) {
-          return mask & (1 << index);
-        });
-        if (group.length >= 2) {
-          addGroup(group);
-        }
-      }
-    } else {
-      for (var a = 0; a < units.length; a++) {
-        for (var b = a + 1; b < units.length; b++) {
-          addGroup([units[a], units[b]]);
-        }
-      }
-    }
+    });
     return forms;
   }
 
