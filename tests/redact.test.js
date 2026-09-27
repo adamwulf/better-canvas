@@ -153,8 +153,27 @@ var units = Redact.createRedactor([
   assert.strictEqual(units.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
 });
 
-// A particle inside a roster name, or as half of a hyphenated name, is not a
-// name on its own.
+// A capitalized particle-like syllable is a real name part, and a hyphen in a
+// roster name also matches a space.
+var syllables = Redact.createRedactor([
+  "Do-Hyun Kim", "Su-Bin Park", "Do-Yoon Kim", "Kim, Do-Yoon",
+  "Jia Le Chen", "Albert \"Al\" Smith", "Mohamed El-Sayed"
+]);
+[
+  ["Do Hyun Kim wrote", "[name] wrote"],
+  ["Su Bin Park wrote", "[name] wrote"],
+  ["Kim Do Yoon wrote", "[name] wrote"],
+  ["Chen Jia Le wrote", "[name] wrote"],
+  ["Jia Le wrote", "[name] wrote"],
+  ["Al said so", "[name] said so"],
+  ["mohamed el sayed wrote", "[name] wrote"],
+  ["El Sayed wrote", "[name] wrote"]
+].forEach(function (pair) {
+  assert.strictEqual(syllables.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
+});
+
+// A lowercase particle inside a roster name, or as half of a hyphenated
+// name, is not a name on its own.
 var particles = Redact.createRedactor([
   "Anna van der Berg", "Omar al-Farsi", "Maria de la Cruz", "Juan del Toro",
   "Ana de los Santos", "Maria do Carmo Silva", "Hans zu Berg"

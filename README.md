@@ -115,11 +115,15 @@ for `Maria Garcia Lopez`, `Ana da Silva` for `Ana Maria Da Silva`, `Kevin Le`
 for `Kevin Minh Le`, `Ana García` for `Ana García-López`; a particle such as
 `de` or `van` joins a form only with the word it belongs to), the surname
 from the sortable form (`van der Berg`), and each part of two or more letters
-except a particle inside the name, such as the `van` of `Anna van der Berg` (`Jane`,
-`Doe`, the halves of `Mary-Jane`, a nickname such as `David` in
-`Wei (David) Zhang`). Accents and letters such as ł, ø, and ß are ignored in
-both directions, so a roster spelling of `Jose Nunez` also catches
-`José Núñez`, and `Müller` also catches `Mueller` (and the reverse). A whole
+(`Jane`, `Doe`, the halves of `Mary-Jane`, a nickname such as `David` in
+`Wei (David) Zhang`) except a particle that the roster writes in lowercase
+inside the name, such as the `van` of `Anna van der Berg` or the `al` of
+`Omar al-Farsi` (a capitalized one, such as the `Le` of `Jia Le Chen`, is
+kept, since it can be a real name syllable). A hyphen in a name also matches
+a space, so `Do-Hyun Kim` catches `Do Hyun Kim`. Accents and letters such as
+ł, ø, and ß are ignored in both directions, so a roster spelling of
+`Jose Nunez` also catches `José Núñez`, and `Müller` also catches `Mueller`
+(and the reverse). A whole
 name (two or more words) matches in any case, such as `jane doe`. A single
 word must have a capital letter (`Doe`, `DOE`, `deWitt`) or be in a script
 with no letter case, so ordinary lowercase words stay intact when a student

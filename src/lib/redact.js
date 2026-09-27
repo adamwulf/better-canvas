@@ -8,8 +8,11 @@
 // and its short name) becomes a set of terms: each whole name, its shorter
 // forms ("Jane Doe"; see shortForms), the surname from the sortable form
 // ("van der Berg"), and each part of two or more letters ("Jane", "Doe", the
-// halves of a hyphenated name, a nickname in parentheses or quotes).
-// Suffixes such as "Jr" and "III" are not terms.
+// halves of a hyphenated name, a nickname in parentheses or quotes). A
+// particle that the roster writes in lowercase inside the name ("van" in
+// "Anna van der Berg", "al" in "Omar al-Farsi") is not a term on its own.
+// Suffixes such as "Jr" and "III" are not terms. A hyphen in a term also
+// matches a space, so "Do-Hyun" catches "Do Hyun".
 //
 // Terms and text are compared in a folded form: accents removed and letters
 // such as ł, ø, ß, and ı spelled out in plain Latin letters. So the roster
@@ -98,15 +101,15 @@
     return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 
-  // Straight and curly apostrophes, and the hyphen variants, are the same
-  // character in a name. The space inside a whole name may be any run of
-  // whitespace with at most one line break: a name can wrap to the next line,
-  // but a blank line ends it.
+  // Straight and curly apostrophes are the same character in a name, and a
+  // hyphen may be any hyphen or one space ("Do-Hyun" or "Do Hyun"). The space
+  // inside a whole name may be any run of whitespace with at most one line
+  // break: a name can wrap to the next line, but a blank line ends it.
   function termPattern(term) {
     return escapeRegExp(term)
       .replace(/['’]/g, "['’]")
-      .replace(/[-‐‑]/g, "[-‐‑]")
-      .replace(/ /g, "(?=\\s)[^\\S\\n]*\\n?[^\\S\\n]*");
+      .replace(/ /g, "(?=\\s)[^\\S\\n]*\\n?[^\\S\\n]*")
+      .replace(/[-‐‑]/g, "[-‐‑ ]");
   }
 
   // "Doe, Jane Q." -> "Jane Q. Doe"
@@ -136,6 +139,13 @@
     return /\p{Lu}/u.test(word) || !/[\p{Lu}\p{Ll}\p{Lt}]/u.test(word);
   }
 
+  // A particle the roster writes in lowercase ("van", "de", "al"). A
+  // capitalized one may be a real name syllable ("Le" in "Jia Le Chen", "Do"
+  // in "Do-Hyun Kim", "Bin" in "Su-Bin Park").
+  function lowercaseParticle(word) {
+    return PARTICLE.test(word) && !/\p{Lu}/u.test(word);
+  }
+
   // The words of a name (in first-last order), without initials or suffixes.
   function nameWords(name) {
     return name.split(PART_SPLIT).map(trimEdges).filter(function (word) {
@@ -148,8 +158,9 @@
   // is the first word ("Van" in "Van Nguyen", "Le" in "Le Thi Hoa") or has no
   // word after it ("Le" in "Minh Anh Le") is a real name, so it is its own
   // unit. Each half of a hyphenated word is a unit too, right after the whole
-  // word, so "Ana García" comes from "Ana García-López". "full" keeps a
-  // unit's particles; "bare" drops them.
+  // word, so "Ana García" comes from "Ana García-López" -- except a lowercase
+  // particle half ("al" in "al-Farsi"). "full" keeps a unit's particles;
+  // "bare" drops them.
   function nameUnits(words) {
     var units = [];
     var pending = [];
@@ -163,7 +174,7 @@
       var halves = word.split(/[-‐‑]/);
       if (halves.length > 1) {
         halves.forEach(function (half) {
-          if (letterCount(half) >= MIN_LETTERS && !PARTICLE.test(half)) {
+          if (letterCount(half) >= MIN_LETTERS && !lowercaseParticle(half)) {
             units.push({ full: half, bare: half });
           }
         });
@@ -270,22 +281,26 @@
       add(ordered);
       add(surname(name));
       shortForms(ordered).forEach(add);
-      // Single words. A particle inside the name ("van" in "Anna van der
-      // Berg") or as half of a hyphenated name ("al" in "al-Farsi") does not
-      // identify anyone on its own, so it is not a term; as the first or last
-      // word it can be a real given name or surname ("Van Nguyen",
-      // "Minh Anh Le"), so it is.
+      // Single words. A lowercase particle inside the name ("van" in "Anna van
+      // der Berg") or as half of a hyphenated name ("al" in "al-Farsi") does
+      // not identify anyone on its own, so it is not a term. A capitalized
+      // one ("Le" in "Jia Le Chen", "Bin" in "Su-Bin Park"), or one that is
+      // the first or last word ("Van Nguyen", "Minh Anh Le"), can be a real
+      // name, so it is.
       var words = nameWords(ordered);
       words.forEach(function (word, index) {
         var edge = index === 0 || index === words.length - 1;
-        if (edge || !PARTICLE.test(word)) {
+        if (edge || !lowercaseParticle(word)) {
           add(word);
         }
-        word.split(/[-‐‑]/).forEach(function (half) {
-          if (!PARTICLE.test(half)) {
-            add(half);
-          }
-        });
+        var halves = word.split(/[-‐‑]/);
+        if (halves.length > 1) {
+          halves.forEach(function (half) {
+            if (!lowercaseParticle(half)) {
+              add(half);
+            }
+          });
+        }
       });
     });
     return { whole: whole, single: single };
