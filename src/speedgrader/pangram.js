@@ -27,7 +27,9 @@
 //
 // With "Send without preview" checked, the section shows only "Send to
 // Pangram", which prepares the text (steps 1-4) and sends it at once, with no
-// dialog. That one setting is saved in chrome.storage.sync.
+// dialog. The Details dialog's "Check again" button then reads "Send to
+// Pangram again" and does the same. That one setting is saved in
+// chrome.storage.sync.
 //
 // SpeedGrader is a React app that switches students without a page load and
 // re-renders the grading panel, so a MutationObserver and the Navigation
