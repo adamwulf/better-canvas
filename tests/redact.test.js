@@ -380,6 +380,8 @@ var handles = Redact.createRedactor(["Seo-Yeon Kim", "Jean-Luc Picard", "Anne-Ma
   ["seoyeon-hw3.py", "[name]-hw3.py"],
   ["site.edu/?user=seoyeon", "site.edu/?user=[name]"],
   ["see ?user=seoyeon now", "see ?user=[name] now"],
+  ["my handle is seoyeon2026", "my handle is [name]2026"],
+  ["annemarie99", "[name]99"],
   // In prose, a lowercase one-word form stays, like other lowercase names.
   ["seoyeon said so", "seoyeon said so"]
 ].forEach(function (pair) {

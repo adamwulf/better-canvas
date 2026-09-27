@@ -482,7 +482,7 @@
     // halves of one hyphenated name joined in lowercase may be an ordinary
     // word in prose ("wanting" for "Wan-Ting"), so that form is taken only in
     // a path, URL, file name, or handle ("/Users/seoyeon/", "@annemarie",
-    // "maryjane_essay.pdf").
+    // "maryjane_essay.pdf") or next to a digit ("seoyeon2026").
     function wholeName(match, text, start) {
       if (/[\s\-‐‑_.'’]/.test(match) || capitalized(match)) {
         return true;
@@ -490,8 +490,10 @@
       if (letterCount(match) < JOINED_MIN_LETTERS) {
         return false;
       }
+      var end = start + match.length;
       return !terms.joinedHalves[fold(match).toLowerCase()] ||
-        inPathOrHandle(text, start, start + match.length);
+        inPathOrHandle(text, start, end) ||
+        /\p{N}/u.test(text[start - 1] || "") || /\p{N}/u.test(text[end] || ""); // "seoyeon2026"
     }
 
     // NFC here too, so composed and decomposed accents in the text fold the
