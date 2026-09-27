@@ -56,6 +56,10 @@
 .bc-pg-winner {
   font-weight: 700;
 }
+.bc-pg-sent-notes {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
 .bc-pg-section-error {
   margin: 0 0 6px;
   color: #b3261e;

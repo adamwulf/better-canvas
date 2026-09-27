@@ -114,13 +114,16 @@ submission details. It checks the student on screen with
 4. **Send to Pangram** (in the dialog or in the box) closes the dialog. The
    box shows the progress, then Pangram's verdict and the AI, AI-assisted,
    and human percentages, one per line, with the largest in bold. The box
-   turns light red, yellow, or green for the largest. **Details** opens the
-   full result, with the text colored by segment.
+   turns light red, yellow, or green for the largest, and notes any NetIDs
+   not replaced or files skipped. **Details** opens the full result: the
+   replacement counts and the text colored by segment.
 
 Check **Send without preview** to skip the review: the box then shows only
 **Send to Pangram**, which reads, redacts, and sends the text in one go, with
-no dialog. Names, NetIDs, and email addresses are still replaced. The
-setting is saved in Chrome's synced extension storage.
+no dialog. Names and email addresses are still replaced, and NetIDs when
+Canvas shares login IDs; nobody reads the text first. In **Details**, the
+**Check again** button becomes **Send to Pangram again**. The setting is
+saved in Chrome's synced extension storage.
 
 Name matching aims at the usual forms of a name; the editable preview is for
 the rest. From each roster name (display name, sortable name, short name):
@@ -266,10 +269,10 @@ on (`canvas.rice.edu` or `hq.globaltech.org`) using your existing session
 flashcards send no network requests at all; the face-photo downloader requests
 only the image URLs already present on the Esther roster, using your existing
 session. The one exception to "no third party" is the Pangram check: when you
-click **Send to Pangram**, and only then, the redacted text goes to Pangram's
-API — as you left it in the preview box, or straight from redaction with
-**Send without preview** checked. No file, file name, or Canvas ID is sent
-with it.
+click **Send to Pangram** (or **Send to Pangram again**), and only then, the
+redacted text goes to Pangram's API — as you left it in the preview box, or
+straight from redaction with **Send without preview** checked. No file, file
+name, or Canvas ID is sent with it.
 
 ## Install (load unpacked)
 

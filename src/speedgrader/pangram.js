@@ -500,6 +500,19 @@
     return lines;
   }
 
+  // What the redaction could not cover, shown with the result because a
+  // check sent without preview never showed the review dialog.
+  function sentNotes(preview) {
+    var notes = [];
+    if (!preview.idsKnown) {
+      notes.push("NetIDs were not replaced.");
+    }
+    if (preview.skipped.length) {
+      notes.push(preview.skipped.length === 1 ? "1 file was skipped." : preview.skipped.length + " files were skipped.");
+    }
+    return notes.length ? el("div", "bc-pg-skipped bc-pg-sent-notes", notes.join(" ")) : null;
+  }
+
   function stageText(stage) {
     return stage ? " (" + stage.replace(/^STAGE_/, "").toLowerCase().replace(/_/g, " ") + ")" : "";
   }
@@ -578,7 +591,12 @@
       section.appendChild(el("h3", "bc-pg-section-title",
         "Pangram: " + (result.prediction_short || result.headline || "Result")));
       section.appendChild(scoreLines(result, top));
+      var notes = sentNotes(state.preview);
+      if (notes) {
+        section.appendChild(notes);
+      }
       sectionRow(section).appendChild(button("Details", "bc-pg-link", forStudent(target.key, showDialog)));
+      section.appendChild(previewOption()); // the mode "Check again" in Details uses
       return;
     }
 
@@ -776,8 +794,10 @@
       }
       body.appendChild(head);
       body.appendChild(fractionBar(result));
+      body.appendChild(facts(state.preview));
       body.appendChild(resultText(result));
-      footer.appendChild(button("Check again", "", function () {
+      // With "Send without preview" on, this sends at once, so it says so.
+      footer.appendChild(button(sendWithoutPreview ? "Send to Pangram again" : "Check again", "", function () {
         var target = currentTarget();
         if (target && target.key === state.key) {
           if (sendWithoutPreview) {
