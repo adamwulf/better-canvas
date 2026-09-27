@@ -355,15 +355,29 @@
     return true;
   }
 
-  // True when text[start] opens a sentence: it is at the start of the text,
-  // after a blank line, or after . ! ? or : -- with only spaces, line breaks,
-  // opening quotes, or brackets between. A single line break is not enough,
-  // since PDF text breaks every visual line, and a period after an initial or
-  // a title ("Thanh V. Do", "Dr. He") does not end a sentence.
+  // True when text[start] opens a sentence:
+  //   - an opening quote is right before it (a quoted sentence: said, "He
+  //     who hesitates");
+  //   - only a bullet or a list number is before it on its line ("• In", "1) In");
+  //   - or it is at the start of the text, after a blank line, or after . ! ?
+  //     or : -- with only spaces, line breaks, quotes, brackets, or a footnote
+  //     number between (.” He, .) In, .[3] He).
+  // A single line break is not enough, since PDF text breaks every visual
+  // line, and a period after an initial or a title ("Thanh V. Do", "Dr. He")
+  // does not end a sentence.
   function sentenceStart(text, start) {
+    var prev = text[start - 1];
+    if (prev === "“" || prev === "‘" ||
+        ((prev === "\"" || prev === "'") && (start < 2 || /\s/.test(text[start - 2])))) {
+      return true;
+    }
+    var line = text.slice(text.lastIndexOf("\n", start - 1) + 1, start);
+    if (/\S/.test(line) && !/\p{L}/u.test(line)) {
+      return true;
+    }
     var i = start - 1;
     var breaks = 0;
-    while (i >= 0 && /["'“‘(\[\s]/.test(text[i])) {
+    while (i >= 0 && /["'“”‘’()[\]\d\s]/.test(text[i])) {
       if (text[i] === "\n") {
         breaks++;
       }
@@ -380,16 +394,29 @@
   }
 
   // A single-word name must be capitalized. A short name that is also a
-  // common sentence-opening word ("He", "An", "In", "So", "Do") is not
-  // replaced at the start of a sentence, where it is nearly always the
-  // ordinary word ("He grew up poor.", "Do you agree?") -- unless a number
-  // follows it, as in an MLA running head ("Do 2" at the top of a page).
+  // common sentence-opening word ("He", "An", "In", "So", "Do") is kept at
+  // the start of a sentence, where it is nearly always the ordinary word
+  // ("He grew up poor.", "Do you agree?"), and in an all-caps heading
+  // ("SLEEP IN MEMORY") -- unless a number follows it, as in an MLA running
+  // head ("Do 2" at the top of a page). A hyphenated name that starts with
+  // such a word ("In-Young", which also matches "In young") is kept at a
+  // sentence start unless its later words are capitalized too.
   function singleName(word, text, start) {
     if (!capitalized(word)) {
       return false;
     }
-    if (!OPENERS.test(word) || !sentenceStart(text, start)) {
+    var parts = word.split(/[\s\-‐‑]+/);
+    if (!OPENERS.test(parts[0])) {
       return true;
+    }
+    var heading = parts.length === 1 && word === word.toUpperCase();
+    if (!heading && !sentenceStart(text, start)) {
+      return true;
+    }
+    if (parts.length > 1) {
+      return parts.slice(1).every(function (part) {
+        return /^\p{Lu}/u.test(part);
+      });
     }
     return /^[ \t]+\d/.test(text.slice(start + word.length, start + word.length + 8));
   }

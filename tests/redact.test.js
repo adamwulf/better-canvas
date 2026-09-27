@@ -223,6 +223,30 @@ var openers = Redact.createRedactor(["Wei He", "Minh An", "Thanh Van Do", "In-Yo
   assert.strictEqual(openers.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
 });
 
+// Quotes, brackets, footnotes, bullets, headings, and hyphenated openers.
+var quoted = Redact.createRedactor(["Wei He", "Hye-In Choi", "Linh To", "In-Young Lee", "So-Young Park"]);
+[
+  "She writes, “The policy failed.” He then argues.",
+  "“The end.” In other words, no.",
+  "It ended.” To understand why, look.",
+  "As Smith argues, “In the long run” it works.",
+  "As Smith argues, \"In the long run\" it works.",
+  "He said, “He who hesitates is lost.”",
+  "• In the first case, yes.\n1) In the second case, no.",
+  "It was over.) In short, yes.",
+  "Scholars found this.[3] He noted it.",
+  "In young children, language develops.",
+  "So young a nation.",
+  "THE ROLE OF SLEEP IN MEMORY",
+  "A RESPONSE TO CRITICS"
+].forEach(function (text) {
+  assert.strictEqual(quoted.redact(text).text, text, JSON.stringify(text));
+});
+assert.strictEqual(quoted.redact("I met He at lunch.").text, "I met [name] at lunch.");
+assert.strictEqual(quoted.redact("In-Young said hi.").text, "[name] said hi.");
+assert.strictEqual(quoted.redact("In Young Lee wrote it.").text, "[name] wrote it.");
+assert.strictEqual(quoted.redact("the essay by\nTo and me").text, "the essay by\n[name] and me");
+
 // The opener list is checked on the name as written, so an accented name
 // that folds to an opener is still replaced at a sentence start.
 var accented = Redact.createRedactor(["Đỗ Minh Anh"]);

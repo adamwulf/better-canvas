@@ -134,9 +134,13 @@ is named Will, May, or Rose, or has a particle such as `de` or `al` in their
 name; suffixes such as `Jr` and `III` are never replaced alone. A short name
 that is also a common sentence opener (`He`, `An`, `In`, `So`, `Do`) is not
 replaced at the start of a sentence (the start of the text, after a blank
-line, or after `.`, `!`, `?`, or `:`, but not after an initial or a title
-such as `V.` or `Dr.`), where it is nearly always the ordinary word; it is
-replaced everywhere else, and always in an MLA running head such as `Do 2`.
+line, after `.`, `!`, `?`, or `:` even with a closing quote or bracket
+between, right after an opening quote, or after a bullet; but not after an
+initial or a title such as `V.` or `Dr.`) or in an all-caps heading, where it
+is nearly always the ordinary word; it is replaced everywhere else, and
+always in an MLA running head such as `Do 2`. A hyphenated name that starts
+with such a word (`In-Young`) is kept the same way unless its later words are
+capitalized too, so "In young children" stays.
 A lowercase
 name inside an email address is covered because the whole address is
 replaced. The preview dialog reminds you to read the text for any other form
