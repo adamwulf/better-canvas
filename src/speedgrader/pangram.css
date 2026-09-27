@@ -65,17 +65,22 @@
   color: #b3261e;
 }
 .bc-pg-busy {
+  margin-top: 6px;
   font-weight: 600;
 }
 .bc-pg-section .bc-pg-option {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: 8px 0 0;
+  margin: 0 0 8px;
   font-size: 13px;
   font-weight: 400;
   color: #5a6475;
   cursor: pointer;
+}
+.bc-pg-section .bc-pg-option.bc-pg-option-off {
+  opacity: 0.5;
+  cursor: default;
 }
 .bc-pg-section .bc-pg-option input {
   margin: 0;
@@ -97,7 +102,10 @@
   line-height: 1.3;
   cursor: pointer;
 }
-.bc-pg-button:hover {
+/* Only an enabled button reacts to hover, so a disabled one keeps its own
+ * background (a primary one stays blue). :where() adds no specificity, so the
+ * link and close styles below still override these. */
+.bc-pg-button:where(:enabled):hover {
   background: #eef1f6;
 }
 .bc-pg-button.bc-pg-primary {
@@ -105,12 +113,10 @@
   background: #2b5586;
   color: #fff;
 }
-.bc-pg-button.bc-pg-primary:hover {
+.bc-pg-button.bc-pg-primary:where(:enabled):hover {
   background: #244a75;
 }
-.bc-pg-button:disabled,
-.bc-pg-button:disabled:hover {
-  background: #fff;
+.bc-pg-button:disabled {
   opacity: 0.5;
   cursor: default;
 }
