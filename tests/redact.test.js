@@ -358,6 +358,10 @@ var joined = Redact.createRedactor([
   assert.strictEqual(joined.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
 });
 
+// A joined pair gets no umlaut spelling across the join.
+var mae = Redact.createRedactor(["Lily Mae King"]);
+assert.strictEqual(mae.redact("Making plans. MaeKing wrote.").text, "Making plans. [name] wrote.");
+
 // The lowercase joined form of a hyphenated given name in paths, URLs, file
 // names, and handles.
 var handles = Redact.createRedactor(["Seo-Yeon Kim", "Jean-Luc Picard", "Anne-Marie Roy", "Mary-Jane Watson"]);

@@ -134,9 +134,11 @@ letters, the ʻokina counts as an apostrophe, an apostrophe may be left out
 (`OBrien` for `O'Brien`), and the words of a whole name (and the halves of a
 hyphenated one) may be joined by an underscore, a dot, or nothing
 (`Jane_Doe`, `jane.doe`, `maria_garcia_lopez`, `JaneDoe`, `@janedoe`,
-`DeLaCruz`, `Jimin` for `Ji Min Park`, `Subin` for `Su Bin Park`). A joined
-name in all lowercase needs 6 or more letters (so `anle` is not taken for a
-word). When it is only the two halves of one hyphenated name, it may be an
+`DeLaCruz`, `Jimin` for `Ji Min Park`). Two neighboring name words joined
+into one word are also caught when capitalized (`Subin` for `Su Bin Park`,
+`Xiaole` for `Xiao Le Wang`); in lowercase that form falls under the
+lowercase-single-name rule below. A whole name joined in all lowercase needs
+6 or more letters (so `anle` is not taken for a word). When it is only the two halves of one hyphenated name, it may be an
 ordinary word (`wanting` for `Wan-Ting`), so in prose it is kept, but in a
 path, URL, file name, or handle it is replaced (`/Users/seoyeon/`,
 `@annemarie`, `maryjane_essay.pdf`); `Wanting` with a capital is always

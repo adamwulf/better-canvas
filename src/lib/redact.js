@@ -322,12 +322,14 @@
     var single = Object.create(null);
     var joinedHalves = Object.create(null);
 
-    function add(term) {
+    // plain: skip the second spellings (see spellings), for a term made by
+    // joining two words, where an ae/oe/ue across the join is no umlaut.
+    function add(term, plain) {
       term = trimEdges(tidy(term));
       if (letterCount(term) < MIN_LETTERS || SUFFIX.test(term)) {
         return;
       }
-      spellings(term).forEach(function (form) {
+      (plain ? [term] : spellings(term)).forEach(function (form) {
         form = fold(form);
         if (letterCount(form) >= MIN_LETTERS) {
           (/ /.test(form) ? whole : single)[form.toLowerCase()] = form;
@@ -364,7 +366,7 @@
         // make a pair.
         var next = words[index + 1];
         if (next && !(lowercaseParticle(word) && lowercaseParticle(next))) {
-          add(word + next);
+          add(word + next, true); // "MaeKing" must not become "MaKing"
         }
         var halves = word.split(/[-‐‑]/);
         if (halves.length > 1) {
