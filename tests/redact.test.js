@@ -285,6 +285,12 @@ var mailed = netids.redact("Email jd45@rice.edu or Jane Doe");
 assert.strictEqual(mailed.text, "Email [email] or [name]");
 assert.strictEqual(mailed.emails, 1);
 assert.strictEqual(mailed.ids, 0);
+assert.strictEqual(netids.idCount, 2); // jd45 and ab123; "x1" and "" are too short
+
+// A login ID in email form also gives the bare NetID.
+var emailLogins = Redact.createRedactor(["Jane Doe"], ["jd45@rice.edu"]);
+assert.strictEqual(emailLogins.idCount, 1);
+assert.strictEqual(emailLogins.redact("by jd45, or jd45@rice.edu").text, "by [netid], or [email]");
 
 // More name variants: a left-out apostrophe, the ʻokina, full-width letters
 // and ligatures, and names joined by an underscore or a dot.
@@ -301,10 +307,32 @@ var variants = Redact.createRedactor([
   ["Griﬃn wrote", "[name] wrote"],
   ["Jane_Doe_essay.pdf", "[name]_essay.pdf"],
   ["see jane.doe on the forum", "see [name] on the forum"],
+  // A whole name with no joiner at all.
+  ["JaneDoe wrote", "[name] wrote"],
+  ["follow @janedoe today", "follow @[name] today"],
   // Lowercase single words still stay.
   ["obrien", "obrien"]
 ].forEach(function (pair) {
   assert.strictEqual(variants.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
+});
+
+// Joins across a hyphen inside a name, and particle surnames written as one
+// word; a short joined name is not taken for an ordinary word.
+var joins = Redact.createRedactor([
+  "Maria García-López", "Mary-Jane O'Brien", "Wan-Ting Li",
+  "Sofia de la Cruz", "Lucas Da Silva", "Anna van der Berg", "An Le"
+]);
+[
+  ["maria_garcia_lopez.docx", "[name].docx"],
+  ["mary.jane.obrien wrote", "[name] wrote"],
+  ["wan_ting_li wrote", "[name] wrote"],
+  ["Sofia DeLaCruz wrote", "[name] wrote"],
+  ["Delacruz argued", "[name] argued"],
+  ["Lucas DaSilva wrote", "[name] wrote"],
+  ["Anna Vanderberg wrote", "[name] wrote"],
+  ["the anle of it", "the anle of it"]
+].forEach(function (pair) {
+  assert.strictEqual(joins.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
 });
 
 // An empty roster changes nothing but email addresses.

@@ -25,7 +25,8 @@
 // "Søren" matches "Soren", in either direction. A term with ä, ö, ü, å, or ø
 // also gets its ae/oe/ue/aa spelling ("Müller" and "Mueller"), in either
 // direction. An apostrophe may be left out ("OBrien" for "O'Brien"), and the
-// words of a whole name may be joined by an underscore or a dot ("Jane_Doe").
+// words of a whole name may be joined by an underscore, a dot, or nothing
+// ("Jane_Doe", "jane.doe", "JaneDoe", "delacruz"; see wholeName).
 //
 // A match must stand alone as a word. A whole name (two or more words, such as
 // "jane doe" or "van der Berg") matches in any case. A single word must have
@@ -52,6 +53,7 @@
   var SUFFIX = /^(?:jr|sr|ii|iii|iv)$/i;
   var PARTICLE = /^(?:al|bin|ibn|da|das|de|del|della|den|der|di|do|dos|du|el|het|la|las|le|les|lo|los|op|ten|ter|van|vom|von|zu|zum|zur)$/i;
   var MAX_SLOTS = 5;
+  var JOINED_MIN_LETTERS = 6;
 
   // Letters, combining marks, and digits make up a word. A name match may not
   // touch one of these on either side. An underscore is not one, so the names
@@ -118,36 +120,46 @@
   }
 
   // An apostrophe in a name may be straight, curly, or left out ("O'Brien",
-  // "O’Brien", "OBrien"), and a hyphen may be any hyphen, one space, or
-  // nothing ("Do-Hyun", "Do Hyun", "Dohyun"). The space inside a whole name
-  // may be a hyphen, an underscore, or a dot ("smith-jones", "Jane_Doe",
-  // "jane.doe"), or any run of whitespace with at most one line break: a
-  // name can wrap to the next line, but a blank line ends it.
+  // "O’Brien", "OBrien"), and a hyphen may be any hyphen, one space, an
+  // underscore, a dot, or nothing ("Do-Hyun", "Do Hyun", "Dohyun",
+  // "garcia_lopez"). The space inside a whole name may be a hyphen, an
+  // underscore, a dot, nothing ("smith-jones", "Jane_Doe", "jane.doe",
+  // "JaneDoe"), or any run of whitespace with at most one line break: a name
+  // can wrap to the next line, but a blank line ends it.
   function termPattern(term) {
     return escapeRegExp(term)
       .replace(/['’]/g, "['’]?")
-      .replace(/ /g, "(?:\\u2010|\\u2011|\\x2d|_|\\.|(?=\\s)[^\\S\\n]*\\n?[^\\S\\n]*)")
-      .replace(/[-‐‑]/g, "[-‐‑ ]?");
+      .replace(/ /g, "(?:\\u2010|\\u2011|\\x2d|_|\\.|(?=\\s)[^\\S\\n]*\\n?[^\\S\\n]*)?")
+      .replace(/[-‐‑]/g, "[-‐‑ _.]?");
   }
 
-  // One case-insensitive regex for the roster's NetIDs (Canvas login IDs,
-  // such as "jd45"), each standing alone as a word. An ID shorter than 3
-  // characters is left out, and one with an @ is an email address, which the
-  // email pass already replaces.
-  function idRegExp(ids) {
+  // The roster's NetIDs (Canvas login IDs, such as "jd45"), lowercased and
+  // without repeats. A login ID in email form ("jd45@rice.edu") gives its
+  // local part too, since a paper may write the bare NetID; the email pass
+  // replaces the full address. An ID shorter than 3 characters is left out.
+  function netIdList(ids) {
     var unique = Object.create(null);
     (ids || []).forEach(function (id) {
       id = String(id || "").trim();
-      if (id.length >= 3 && id.indexOf("@") === -1) {
-        unique[id.toLowerCase()] = id;
+      var at = id.indexOf("@");
+      if (at !== -1) {
+        id = id.slice(0, at);
+      }
+      if (id.length >= 3) {
+        unique[id.toLowerCase()] = true;
       }
     });
-    var keys = Object.keys(unique).sort(function (a, b) {
-      return b.length - a.length;
-    });
-    if (!keys.length) {
+    return Object.keys(unique);
+  }
+
+  // One case-insensitive regex for the NetIDs, each standing alone as a word.
+  function idRegExp(list) {
+    if (!list.length) {
       return null;
     }
+    var keys = list.slice().sort(function (a, b) {
+      return b.length - a.length;
+    });
     return new RegExp(
       "(?<![\\p{L}\\p{N}])(?:" + keys.map(escapeRegExp).join("|") + ")(?![\\p{L}\\p{N}])",
       "giu"
@@ -251,7 +263,8 @@
   }
 
   // The shorter forms of a name that a student often writes in a paper:
-  //   - each unit that has particles: "de la Cruz";
+  //   - each unit that has particles: "de la Cruz" (which, as a whole name,
+  //     also catches "DeLaCruz" and "delacruz");
   //   - every group of units (see slotGroups), with and without their
   //     particles: "Jane Doe" for "Jane Q. Doe", "John Smith" for "John Smith
   //     III", "María García López" for "María José García López", "Sofia de
@@ -379,8 +392,14 @@
     );
   }
 
-  function anyCase() {
-    return true;
+  // A whole name matches in any case. Written with no space at all
+  // ("JaneDoe", "janedoe", "delacruz"), it also needs 6+ letters or a second
+  // capital, so a short joined name ("An Le" -> "anle") is not taken for an
+  // ordinary word.
+  function wholeName(match) {
+    return /[\s\-‐‑_.'’]/.test(match) ||
+      letterCount(match) >= JOINED_MIN_LETTERS ||
+      (match.match(/\p{Lu}/gu) || []).length >= 2;
   }
 
   // Replaces each match of pattern (run on the folded text) that accept()
@@ -415,7 +434,8 @@
     // Whole names go first; the single-word pass then sees what is left.
     var wholeNames = termRegExp(terms.whole);
     var singleWords = termRegExp(terms.single);
-    var netIds = idRegExp(ids);
+    var idList = netIdList(ids);
+    var netIds = idRegExp(idList);
 
     // NFC here too, so composed and decomposed accents in the text fold the
     // same way; lines and paragraphs are left as they are. Email addresses go
@@ -434,7 +454,7 @@
           return ID_MARK;
         });
       }
-      var wholePass = replaceTerms(current, wholeNames, anyCase);
+      var wholePass = replaceTerms(current, wholeNames, wholeName);
       var singlePass = replaceTerms(wholePass.text, singleWords, capitalized);
       return {
         // "Jane Doe" may become "[name] [name]"; one person reads as one mark.
@@ -447,7 +467,8 @@
 
     return {
       redact: redact,
-      termCount: Object.keys(terms.whole).length + Object.keys(terms.single).length
+      termCount: Object.keys(terms.whole).length + Object.keys(terms.single).length,
+      idCount: idList.length // NetIDs it can replace
     };
   }
 

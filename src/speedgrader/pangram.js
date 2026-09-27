@@ -339,7 +339,8 @@
             var detail = extracted.skipped.length ? " Skipped: " + extracted.skipped.join("; ") + "." : "";
             throw new Error("No text was found in this submission." + detail);
           }
-          var redacted = Redact.createRedactor(names, ids).redact(extracted.text);
+          var redactor = Redact.createRedactor(names, ids);
+          var redacted = redactor.redact(extracted.text);
           update(state, {
             status: "ready",
             attempt: loaded[1].attempt,
@@ -347,7 +348,7 @@
               text: redacted.text,
               names: redacted.names,
               ids: redacted.ids,
-              idsKnown: ids.length > 0,
+              idsKnown: redactor.idCount > 0,
               emails: redacted.emails,
               words: wordCount(redacted.text),
               sources: extracted.sources,

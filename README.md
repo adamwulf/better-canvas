@@ -101,8 +101,9 @@ submission details. **Check with Pangram** checks the student on screen with
    Word (`.docx`), or `.txt` file. Other files (images, old `.doc` files) are
    listed as skipped. A scanned PDF with no text layer has no text to check.
 2. Every student name on the course roster is replaced with `[name]`, every
-   roster NetID (the Canvas login ID, such as `jd45`) with `[netid]`, and
-   every email address with `[email]`.
+   roster NetID (the Canvas login ID, such as `jd45`; for a login ID in email
+   form, its part before the `@`) with `[netid]`, and every email address
+   with `[email]`.
 3. A dialog shows the exact redacted text, how many names, NetIDs, and email
    addresses were replaced, and the word count. **Nothing is sent until you
    click Send to Pangram.** If Canvas does not share the roster's login IDs
@@ -130,8 +131,11 @@ name). Accents and letters such as
 `Jose Nunez` also catches `José Núñez`, and `Müller` also catches `Mueller`
 (and the reverse). Full-width letters and ligatures are read as plain
 letters, the ʻokina counts as an apostrophe, an apostrophe may be left out
-(`OBrien` for `O'Brien`), and the words of a whole name may be joined by an
-underscore or a dot (`Jane_Doe`, `jane.doe`). A whole
+(`OBrien` for `O'Brien`), and the words of a whole name (and the halves of a
+hyphenated one) may be joined by an underscore, a dot, or nothing
+(`Jane_Doe`, `jane.doe`, `maria_garcia_lopez`, `JaneDoe`, `@janedoe`,
+`DeLaCruz`); a joined name with no capital inside needs 6 or more letters,
+so a short one such as `anle` is not taken for a word. A whole
 name (two or more words) matches in any case, such as `jane doe`. A single
 word must have a capital letter (`Doe`, `DOE`, `deWitt`) or be in a script
 with no letter case, so ordinary lowercase words stay intact when a student
