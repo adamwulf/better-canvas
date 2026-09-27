@@ -28,13 +28,13 @@
 // an upper-case letter ("Doe", "DOE", "deWitt"), or be in a script with no
 // letter case. Names are proper nouns, so this keeps ordinary lowercase words
 // intact when a student is named Will, May, or Rose, or has a name particle
-// such as "de" or "al". A short single-word name that is also a common
-// sentence opener ("He", "An", "In", "So", "Do") is not replaced at the start
-// of a sentence, unless a page number follows it (an MLA running head). A
-// lowercase single name (a nickname or a user name) is
-// not replaced; the preview dialog says so and shows the text so the grader
-// can read it. Email addresses are replaced first, so a lowercase name inside
-// one is covered.
+// such as "de" or "al". Privacy comes first: a name part that is also a
+// common capitalized word ("He" or "An" as a surname, "In" or "Do" as a name
+// syllable) is replaced wherever it is capitalized, even where it opens a
+// sentence as the ordinary word ("He grew up poor."). A lowercase single name
+// (a nickname or a user name) is not replaced; the preview dialog says so and
+// shows the text so the grader can read it. Email addresses are replaced
+// first, so a lowercase name inside one is covered.
 //
 // Exposed as window.BetterCanvasRedact so sibling content scripts can use it.
 
@@ -47,13 +47,6 @@
   var SUFFIX = /^(?:jr|sr|ii|iii|iv)$/i;
   var PARTICLE = /^(?:al|bin|ibn|da|das|de|del|della|den|der|di|do|dos|du|el|het|la|las|le|les|lo|los|op|ten|ter|van|vom|von|zu|zum|zur)$/i;
   var MAX_SLOTS = 5;
-  // Short words that often open an English sentence and are also name parts
-  // ("He" and "An" as surnames, "In" and "So" as Korean syllables).
-  // Matched against the word as written, so an accented name ("Đỗ") is never
-  // taken for the English word.
-  var OPENERS = /^(?:an|as|at|be|by|do|go|he|if|in|is|it|me|my|no|of|oh|on|or|so|to|up|us|we)$/i;
-  // A period after one of these does not end a sentence.
-  var TITLES = /^(?:dr|mr|mrs|ms|mx|prof|st)$/i;
 
   // Letters, combining marks, and digits make up a word. A name match may not
   // touch one of these on either side.
@@ -355,75 +348,8 @@
     return true;
   }
 
-  // True when text[start] opens a sentence:
-  //   - an opening quote is right before it (a quoted sentence: said, "He
-  //     who hesitates");
-  //   - only a bullet or a list number is before it on its line ("• In", "1) In");
-  //   - or it is at the start of the text, after a blank line, or after . ! ?
-  //     or : -- with only spaces, line breaks, quotes, brackets, or a footnote
-  //     number between (.” He, .) In, .[3] He).
-  // A single line break is not enough, since PDF text breaks every visual
-  // line, and a period after an initial or a title ("Thanh V. Do", "Dr. He")
-  // does not end a sentence.
-  function sentenceStart(text, start) {
-    var prev = text[start - 1];
-    if (prev === "“" || prev === "‘" ||
-        ((prev === "\"" || prev === "'") && (start < 2 || /\s/.test(text[start - 2])))) {
-      return true;
-    }
-    var line = text.slice(text.lastIndexOf("\n", start - 1) + 1, start);
-    if (/\S/.test(line) && !/\p{L}/u.test(line)) {
-      return true;
-    }
-    var i = start - 1;
-    var breaks = 0;
-    while (i >= 0 && /["'“”‘’()[\]\d\s]/.test(text[i])) {
-      if (text[i] === "\n") {
-        breaks++;
-      }
-      i--;
-    }
-    if (i < 0 || breaks >= 2 || /[!?:]/.test(text[i])) {
-      return true;
-    }
-    if (text[i] !== ".") {
-      return false;
-    }
-    var before = text.slice(Math.max(0, i - 5), i).match(/\p{L}+$/u);
-    return !(before && (before[0].length === 1 || TITLES.test(before[0])));
-  }
-
-  // A single-word name must be capitalized. A short name that is also a
-  // common sentence-opening word ("He", "An", "In", "So", "Do") is kept at
-  // the start of a sentence, where it is nearly always the ordinary word
-  // ("He grew up poor.", "Do you agree?"), and in an all-caps heading
-  // ("SLEEP IN MEMORY") -- unless a number follows it, as in an MLA running
-  // head ("Do 2" at the top of a page). A hyphenated name that starts with
-  // such a word ("In-Young", which also matches "In young") is kept at a
-  // sentence start unless its later words are capitalized too.
-  function singleName(word, text, start) {
-    if (!capitalized(word)) {
-      return false;
-    }
-    var parts = word.split(/[\s\-‐‑]+/);
-    if (!OPENERS.test(parts[0])) {
-      return true;
-    }
-    var heading = parts.length === 1 && word === word.toUpperCase();
-    if (!heading && !sentenceStart(text, start)) {
-      return true;
-    }
-    if (parts.length > 1) {
-      return parts.slice(1).every(function (part) {
-        return /^\p{Lu}/u.test(part);
-      });
-    }
-    return /^[ \t]+\d/.test(text.slice(start + word.length, start + word.length + 8));
-  }
-
   // Replaces each match of pattern (run on the folded text) that accept()
-  // allows, judged on the original spelling and its place in the text.
-  // Returns the new text and count.
+  // allows, judged on the original spelling. Returns the new text and count.
   function replaceTerms(text, pattern, accept) {
     if (!pattern) {
       return { text: text, count: 0 };
@@ -437,7 +363,7 @@
     while ((match = pattern.exec(folded.folded)) !== null) {
       var start = folded.map[match.index];
       var end = folded.map[match.index + match[0].length];
-      if (accept(text.slice(start, end), text, start)) {
+      if (accept(text.slice(start, end))) {
         out += text.slice(last, start) + NAME_MARK;
         last = end;
         count++;
@@ -464,7 +390,7 @@
         return EMAIL_MARK;
       });
       var wholePass = replaceTerms(current, wholeNames, anyCase);
-      var singlePass = replaceTerms(wholePass.text, singleWords, singleName);
+      var singlePass = replaceTerms(wholePass.text, singleWords, capitalized);
       return {
         // "Jane Doe" may become "[name] [name]"; one person reads as one mark.
         text: singlePass.text.replace(/\[name\](?:[ \t]+\[name\])+/g, NAME_MARK),

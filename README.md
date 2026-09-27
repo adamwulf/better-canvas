@@ -131,17 +131,11 @@ name (two or more words) matches in any case, such as `jane doe`. A single
 word must have a capital letter (`Doe`, `DOE`, `deWitt`) or be in a script
 with no letter case, so ordinary lowercase words stay intact when a student
 is named Will, May, or Rose, or has a particle such as `de` or `al` in their
-name; suffixes such as `Jr` and `III` are never replaced alone. A short name
-that is also a common sentence opener (`He`, `An`, `In`, `So`, `Do`) is not
-replaced at the start of a sentence (the start of the text, after a blank
-line, after `.`, `!`, `?`, or `:` even with a closing quote or bracket
-between, right after an opening quote, or after a bullet; but not after an
-initial or a title such as `V.` or `Dr.`) or in an all-caps heading, where it
-is nearly always the ordinary word; it is replaced everywhere else, and
-always in an MLA running head such as `Do 2`. A hyphenated name that starts
-with such a word (`In-Young`) is kept the same way unless its later words are
-capitalized too, so "In young children" stays.
-A lowercase
+name; suffixes such as `Jr` and `III` are never replaced alone. Privacy comes
+first: a name part that is also a common capitalized word (`He` or `An` as a
+surname, `In` or `Do` as a name syllable) is replaced wherever it is
+capitalized, so in a course with a student named He, a sentence that starts
+"He grew up…" also becomes "[name] grew up…". A lowercase
 name inside an email address is covered because the whole address is
 replaced. The preview dialog reminds you to read the text for any other form
 of a name (a lowercase nickname or user name) before you send.

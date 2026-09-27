@@ -203,55 +203,31 @@ var hyphens = Redact.createRedactor([
   assert.strictEqual(hyphens.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
 });
 
-// A short name that is also a sentence opener is not replaced at the start of
-// a sentence or line, but is everywhere else.
-var openers = Redact.createRedactor(["Wei He", "Minh An", "Thanh Van Do", "In-Young Lee"]);
+// Privacy first: a short name that is also a common capitalized word is
+// replaced wherever it is capitalized, even at a sentence start, in a
+// heading, after a quote, or in a running head. Only lowercase stays.
+var capitals = Redact.createRedactor([
+  "Wei He", "Minh An", "Thanh Van Do", "In-Young Lee", "Hye-In Choi", "Linh To",
+  "Do-yoon Kim", "\u0110\u1ed7 Minh Anh"
+]);
 [
-  ["He grew up poor. An important factor was school.", "He grew up poor. An important factor was school."],
-  ["Do you agree?\nIn short, yes. \"So what?\" (In fact, no.)", "Do you agree?\nIn short, yes. \"So what?\" (In fact, no.)"],
+  ["He grew up poor. An important factor was school.", "[name] grew up poor. [name] important factor was school."],
   ["I met He at lunch.", "I met [name] at lunch."],
   ["Wei He wrote this.", "[name] wrote this."],
-  ["As An and Do argued", "As [name] and [name] argued"],
-  // A single line break (every PDF line) is not a sentence start.
   ["my lab partner\nAn and I", "my lab partner\n[name] and I"],
-  // An MLA running head keeps its page number, so it is a name.
   ["end of page one.\n\nDo 2\nThe next page", "end of page one.\n\n[name] 2\nThe next page"],
-  // A period after an initial or a title does not end a sentence.
   ["Thanh V. Do wrote", "[name] V. [name] wrote"],
-  ["We asked Dr. He first.", "We asked Dr. [name] first."]
+  ["She writes, \u201cThe policy failed.\u201d He then argues.", "She writes, \u201cThe policy failed.\u201d [name] then argues."],
+  ["Do-yoon said so. Do-Yoon agreed.", "[name] said so. [name] agreed."],
+  ["In-young said hi.", "[name] said hi."],
+  ["Submitted by David HE for ENGL 101", "Submitted by David [name] for ENGL 101"],
+  ["\u0110\u1ed7 argued.", "[name] argued."],
+  // Lowercase words are never replaced alone.
+  ["he said it in so many words; do you agree?", "he said it in so many words; do you agree?"],
+  ["Obesity in young children", "Obesity in young children"]
 ].forEach(function (pair) {
-  assert.strictEqual(openers.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
+  assert.strictEqual(capitals.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
 });
-
-// Quotes, brackets, footnotes, bullets, headings, and hyphenated openers.
-var quoted = Redact.createRedactor(["Wei He", "Hye-In Choi", "Linh To", "In-Young Lee", "So-Young Park"]);
-[
-  "She writes, “The policy failed.” He then argues.",
-  "“The end.” In other words, no.",
-  "It ended.” To understand why, look.",
-  "As Smith argues, “In the long run” it works.",
-  "As Smith argues, \"In the long run\" it works.",
-  "He said, “He who hesitates is lost.”",
-  "• In the first case, yes.\n1) In the second case, no.",
-  "It was over.) In short, yes.",
-  "Scholars found this.[3] He noted it.",
-  "In young children, language develops.",
-  "So young a nation.",
-  "THE ROLE OF SLEEP IN MEMORY",
-  "A RESPONSE TO CRITICS"
-].forEach(function (text) {
-  assert.strictEqual(quoted.redact(text).text, text, JSON.stringify(text));
-});
-assert.strictEqual(quoted.redact("I met He at lunch.").text, "I met [name] at lunch.");
-assert.strictEqual(quoted.redact("In-Young said hi.").text, "[name] said hi.");
-assert.strictEqual(quoted.redact("In Young Lee wrote it.").text, "[name] wrote it.");
-assert.strictEqual(quoted.redact("the essay by\nTo and me").text, "the essay by\n[name] and me");
-
-// The opener list is checked on the name as written, so an accented name
-// that folds to an opener is still replaced at a sentence start.
-var accented = Redact.createRedactor(["Đỗ Minh Anh"]);
-assert.strictEqual(accented.redact("Đỗ argued. Then more.").text, "[name] argued. Then more.");
-assert.strictEqual(accented.redact("Do you agree?").text, "Do you agree?");
 
 // A lowercase particle inside a roster name, or as half of a hyphenated
 // name, is not a name on its own.
