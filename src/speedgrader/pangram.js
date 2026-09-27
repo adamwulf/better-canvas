@@ -20,9 +20,10 @@
 //      the dialog shows the result, with the text colored by segment.
 //
 // SpeedGrader is a React app that switches students without a page load and
-// re-renders the grading panel, so a MutationObserver keeps the section in
-// place and in step with the student in the URL. Results are kept in memory
-// for this page only; nothing is persisted.
+// re-renders the grading panel, so a MutationObserver and the Navigation
+// API's currententrychange event keep the section in place and in step with
+// the student in the URL. Each section button checks the URL again before it
+// acts. Results are kept in memory for this page only; nothing is persisted.
 
 (function () {
   "use strict";
@@ -65,10 +66,17 @@
     return node;
   }
 
+  // The second click of a double-click is ignored: the first click often
+  // opens the dialog or swaps its buttons, and the second would then land on
+  // the backdrop or on a new button (such as "Close" where "Send" was).
   function button(label, className, onClick) {
     var node = el("button", "bc-pg-button " + (className || ""), label);
     node.type = "button";
-    node.addEventListener("click", onClick);
+    node.addEventListener("click", function (event) {
+      if (event.detail <= 1) {
+        onClick(event);
+      }
+    });
     return node;
   }
 
@@ -401,6 +409,23 @@
       percent(result.fraction_human) + " human";
   }
 
+  // A section button acts only if its student is still the one in the URL;
+  // otherwise the section is out of date, so it is redrawn instead.
+  function forStudent(key, action) {
+    return function () {
+      var target = currentTarget();
+      if (target && target.key === key) {
+        action(target);
+      } else {
+        renderSection();
+      }
+    };
+  }
+
+  function showDialog(target) {
+    openDialog(target.key);
+  }
+
   function fillSection(section, target, state) {
     section.textContent = "";
     section.appendChild(el("h3", "bc-pg-section-title", "Pangram"));
@@ -409,24 +434,18 @@
 
     if (state.status === "preparing" || state.status === "checking" || state.status === "ready") {
       var label = state.status === "ready" ? "Ready to send — review the text" : "Working…";
-      row.appendChild(button(label, "", function () {
-        openDialog(target.key);
-      }));
+      row.appendChild(button(label, "", forStudent(target.key, showDialog)));
       return;
     }
     if (state.status === "done") {
       row.appendChild(el("span", "bc-pg-summary bc-pg-verdict-" + verdictClass(state.result), summaryText(state.result)));
-      row.appendChild(button("Details", "bc-pg-link", function () {
-        openDialog(target.key);
-      }));
+      row.appendChild(button("Details", "bc-pg-link", forStudent(target.key, showDialog)));
       return;
     }
     if (state.status === "error") {
       row.appendChild(el("span", "bc-pg-section-error", "Last check failed."));
     }
-    row.appendChild(button("Check with Pangram", "bc-pg-primary", function () {
-      prepare(target);
-    }));
+    row.appendChild(button("Check with Pangram", "bc-pg-primary", forStudent(target.key, prepare)));
   }
 
   function renderSection() {
@@ -649,7 +668,7 @@
       panel.appendChild(footer);
       root.appendChild(panel);
       root.addEventListener("click", function (event) {
-        if (event.target === root) {
+        if (event.target === root && event.detail <= 1) {
           closeDialog();
         }
       });
@@ -698,6 +717,9 @@
     });
   }
 
+  // SpeedGrader may switch students by only rewriting text in place, which a
+  // childList observer does not see, so a URL change also redraws.
   renderSection();
   new MutationObserver(scheduleRender).observe(document.body, { childList: true, subtree: true });
+  navigation.addEventListener("currententrychange", scheduleRender);
 })();
