@@ -56,6 +56,11 @@
 .bc-pg-winner {
   font-weight: 700;
 }
+.bc-pg-checked {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: #5a6475;
+}
 .bc-pg-sent-notes {
   margin: 0 0 6px;
   font-size: 13px;

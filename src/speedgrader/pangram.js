@@ -11,7 +11,8 @@
 //      (GET /api/v1/courses/:id/users?enrollment_type[]=student).
 //   3. Turn the submission into plain text in the browser: the text-entry
 //      body, or each PDF, Word (.docx), or .txt file
-//      (BetterCanvasSubmissionText).
+//      (BetterCanvasSubmissionText), joined into one text. If a result is
+//      saved for that text, show it and stop here (see below).
 //   4. Replace every roster name with "[name]", every roster NetID (the
 //      Canvas login_id) with "[netid]", and every email address with
 //      "[email]" (BetterCanvasRedact). If the roster cannot load, the check
@@ -37,8 +38,16 @@
 // re-renders the grading panel, so a MutationObserver and the Navigation
 // API's currententrychange event keep the section in place and in step with
 // the student in the URL. Each section button checks the URL again before it
-// acts. Check results are kept in memory for this page only; they are not
-// saved anywhere and are gone when the page reloads.
+// acts.
+//
+// Each result is saved in chrome.storage.local, through the background worker
+// (which keeps that area from content scripts), under the SHA-256 hash of the
+// text from step 3: the submission's joined text before redaction and before
+// any edit in the dialog. Preparing a text with a saved result shows that
+// result and sends nothing. "Check again" (or "Send to Pangram again") always
+// sends a new check, and its result replaces the saved one. A saved result
+// holds Pangram's answer (with the redacted text Pangram scored), the facts
+// shown with it, and the time of the check.
 
 (function () {
   "use strict";
@@ -113,6 +122,10 @@
 
   function wordsText(count) {
     return "Words: " + count.toLocaleString();
+  }
+
+  function checkedText(time) {
+    return "Checked " + new Date(time).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
   }
 
   function delay(ms) {
@@ -323,6 +336,58 @@
     return next(0);
   }
 
+  // ---- Saved results --------------------------------------------------------
+
+  // The hex SHA-256 hash of a text: the name its result is saved under.
+  function textHash(text) {
+    return crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)).then(function (digest) {
+      return Array.from(new Uint8Array(digest), function (byte) {
+        return byte.toString(16).padStart(2, "0");
+      }).join("");
+    });
+  }
+
+  // The saved result for a text hash, or null. A failed read counts as no
+  // saved result, so the check can still run.
+  function loadSaved(hash) {
+    return sendMessage({ type: "pangram-load-result", hash: hash }).then(
+      function (value) {
+        var saved = value.saved;
+        return saved && saved.result && saved.preview && typeof saved.checkedAt === "number" ? saved : null;
+      },
+      function (err) {
+        console.warn("[BetterCanvas] could not read the saved Pangram result", err);
+        return null;
+      }
+    );
+  }
+
+  // Saves a finished check under its text hash, in place of any older result
+  // for the same text. The preview's text is left out: Pangram's result
+  // already holds the text it scored.
+  function saveResult(state) {
+    var preview = state.preview;
+    sendMessage({
+      type: "pangram-save-result",
+      hash: state.hash,
+      saved: {
+        checkedAt: state.checkedAt,
+        result: state.result,
+        preview: {
+          names: preview.names,
+          ids: preview.ids,
+          idsKnown: preview.idsKnown,
+          emails: preview.emails,
+          words: preview.words,
+          sources: preview.sources,
+          skipped: preview.skipped
+        }
+      }
+    }).catch(function (err) {
+      console.warn("[BetterCanvas] could not save the Pangram result", err);
+    });
+  }
+
   // ---- Check flow -----------------------------------------------------------
 
   function currentTarget() {
@@ -360,10 +425,12 @@
 
   // Gets the submission text and redacts it. No dialog opens: the section
   // shows the progress, and then "Details" opens the text for review. With
-  // thenSend the text goes to Pangram as soon as it is ready.
-  function prepare(target, thenSend) {
+  // thenSend the text goes to Pangram as soon as it is ready. A result saved
+  // for the same text is shown instead, unless recheck asks for a new check.
+  function prepare(target, thenSend, recheck) {
     var state = stateFor(target.key);
-    update(state, { status: "preparing", error: "", needsKey: false, result: null, preview: null });
+    update(state, { status: "preparing", error: "", needsKey: false, result: null, preview: null, hash: "", checkedAt: 0 });
+    var roster, submission, extracted, hash;
 
     // The key check runs first: it also starts the background worker, which
     // locks the key away from content scripts before any student file is
@@ -378,33 +445,56 @@
         return Promise.all([loadRoster(), loadSubmission(target)]);
       })
       .then(function (loaded) {
-        var names = loaded[0].names.concat(userNames(loaded[1].user));
-        var ids = loaded[0].ids.concat(userIds(loaded[1].user));
-        return submissionText(loaded[1]).then(function (extracted) {
-          if (!extracted.text) {
-            var detail = extracted.skipped.length ? " Skipped: " + extracted.skipped.join("; ") + "." : "";
-            throw new Error("No text was found in this submission." + detail);
-          }
-          var redactor = Redact.createRedactor(names, ids);
-          var redacted = redactor.redact(extracted.text);
+        roster = loaded[0];
+        submission = loaded[1];
+        return submissionText(submission);
+      })
+      .then(function (found) {
+        if (!found.text) {
+          var detail = found.skipped.length ? " Skipped: " + found.skipped.join("; ") + "." : "";
+          throw new Error("No text was found in this submission." + detail);
+        }
+        extracted = found;
+        return textHash(found.text);
+      })
+      .then(function (digest) {
+        hash = digest;
+        return recheck ? null : loadSaved(hash);
+      })
+      .then(function (saved) {
+        if (saved) {
           update(state, {
-            status: "ready",
-            attempt: loaded[1].attempt,
-            preview: {
-              text: redacted.text,
-              names: redacted.names,
-              ids: redacted.ids,
-              idsKnown: redactor.idCount > 0,
-              emails: redacted.emails,
-              words: wordCount(redacted.text),
-              sources: extracted.sources,
-              skipped: extracted.skipped
-            }
+            status: "done",
+            attempt: submission.attempt,
+            hash: hash,
+            result: saved.result,
+            preview: saved.preview,
+            checkedAt: saved.checkedAt
           });
-          if (thenSend) {
-            send(state);
+          return;
+        }
+        var names = roster.names.concat(userNames(submission.user));
+        var ids = roster.ids.concat(userIds(submission.user));
+        var redactor = Redact.createRedactor(names, ids);
+        var redacted = redactor.redact(extracted.text);
+        update(state, {
+          status: "ready",
+          attempt: submission.attempt,
+          hash: hash,
+          preview: {
+            text: redacted.text,
+            names: redacted.names,
+            ids: redacted.ids,
+            idsKnown: redactor.idCount > 0,
+            emails: redacted.emails,
+            words: wordCount(redacted.text),
+            sources: extracted.sources,
+            skipped: extracted.skipped
           }
         });
+        if (thenSend) {
+          send(state);
+        }
       })
       .catch(function (err) {
         update(state, { status: "error", error: errorText(err), needsKey: !!err.needsKey });
@@ -427,7 +517,8 @@
         .then(function (value) {
           var result = value.result || {};
           if (result.stage === "STAGE_SUCCESS") {
-            update(state, { status: "done", result: result });
+            update(state, { status: "done", result: result, checkedAt: Date.now() });
+            saveResult(state);
             return null;
           }
           if (result.stage === "STAGE_FAILED") {
@@ -598,6 +689,7 @@
       section.appendChild(el("h3", "bc-pg-section-title",
         "Pangram: " + (result.prediction_short || result.headline || "Result")));
       section.appendChild(scoreLines(result, top));
+      section.appendChild(el("div", "bc-pg-checked", checkedText(state.checkedAt)));
       var notes = sentNotes(state.preview);
       if (notes) {
         section.appendChild(notes);
@@ -797,14 +889,17 @@
       }
       body.appendChild(head);
       body.appendChild(fractionBar(result));
-      body.appendChild(facts(state.preview));
+      var list = facts(state.preview);
+      list.insertBefore(el("li", "", checkedText(state.checkedAt)), list.firstChild);
+      body.appendChild(list);
       body.appendChild(resultText(result));
       // With "Send without preview" on, this sends at once, so it says so.
+      // Either way it skips the saved result and makes a new check.
       footer.appendChild(button(sendWithoutPreview ? "Send to Pangram again" : "Check again", "", function () {
         var target = currentTarget();
         if (target && target.key === state.key) {
           closeDialog(); // the section shows this check
-          prepare(target, sendWithoutPreview);
+          prepare(target, sendWithoutPreview, true);
         }
       }));
       footer.appendChild(button("Close", "bc-pg-primary", closeDialog));
