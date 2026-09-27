@@ -133,8 +133,11 @@ with no letter case, so ordinary lowercase words stay intact when a student
 is named Will, May, or Rose, or has a particle such as `de` or `al` in their
 name; suffixes such as `Jr` and `III` are never replaced alone. A short name
 that is also a common sentence opener (`He`, `An`, `In`, `So`, `Do`) is not
-replaced at the start of a sentence or line, where it is nearly always the
-ordinary word; it is replaced everywhere else. A lowercase
+replaced at the start of a sentence (the start of the text, after a blank
+line, or after `.`, `!`, `?`, or `:`, but not after an initial or a title
+such as `V.` or `Dr.`), where it is nearly always the ordinary word; it is
+replaced everywhere else, and always in an MLA running head such as `Do 2`.
+A lowercase
 name inside an email address is covered because the whole address is
 replaced. The preview dialog reminds you to read the text for any other form
 of a name (a lowercase nickname or user name) before you send.

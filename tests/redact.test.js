@@ -211,10 +211,23 @@ var openers = Redact.createRedactor(["Wei He", "Minh An", "Thanh Van Do", "In-Yo
   ["Do you agree?\nIn short, yes. \"So what?\" (In fact, no.)", "Do you agree?\nIn short, yes. \"So what?\" (In fact, no.)"],
   ["I met He at lunch.", "I met [name] at lunch."],
   ["Wei He wrote this.", "[name] wrote this."],
-  ["As An and Do argued", "As [name] and [name] argued"]
+  ["As An and Do argued", "As [name] and [name] argued"],
+  // A single line break (every PDF line) is not a sentence start.
+  ["my lab partner\nAn and I", "my lab partner\n[name] and I"],
+  // An MLA running head keeps its page number, so it is a name.
+  ["end of page one.\n\nDo 2\nThe next page", "end of page one.\n\n[name] 2\nThe next page"],
+  // A period after an initial or a title does not end a sentence.
+  ["Thanh V. Do wrote", "[name] V. [name] wrote"],
+  ["We asked Dr. He first.", "We asked Dr. [name] first."]
 ].forEach(function (pair) {
   assert.strictEqual(openers.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
 });
+
+// The opener list is checked on the name as written, so an accented name
+// that folds to an opener is still replaced at a sentence start.
+var accented = Redact.createRedactor(["Đỗ Minh Anh"]);
+assert.strictEqual(accented.redact("Đỗ argued. Then more.").text, "[name] argued. Then more.");
+assert.strictEqual(accented.redact("Do you agree?").text, "Do you agree?");
 
 // A lowercase particle inside a roster name, or as half of a hyphenated
 // name, is not a name on its own.

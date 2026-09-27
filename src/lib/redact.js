@@ -30,7 +30,8 @@
 // intact when a student is named Will, May, or Rose, or has a name particle
 // such as "de" or "al". A short single-word name that is also a common
 // sentence opener ("He", "An", "In", "So", "Do") is not replaced at the start
-// of a sentence or line. A lowercase single name (a nickname or a user name) is
+// of a sentence, unless a page number follows it (an MLA running head). A
+// lowercase single name (a nickname or a user name) is
 // not replaced; the preview dialog says so and shows the text so the grader
 // can read it. Email addresses are replaced first, so a lowercase name inside
 // one is covered.
@@ -48,7 +49,11 @@
   var MAX_SLOTS = 5;
   // Short words that often open an English sentence and are also name parts
   // ("He" and "An" as surnames, "In" and "So" as Korean syllables).
+  // Matched against the word as written, so an accented name ("Đỗ") is never
+  // taken for the English word.
   var OPENERS = /^(?:an|as|at|be|by|do|go|he|if|in|is|it|me|my|no|of|oh|on|or|so|to|up|us|we)$/i;
+  // A period after one of these does not end a sentence.
+  var TITLES = /^(?:dr|mr|mrs|ms|mx|prof|st)$/i;
 
   // Letters, combining marks, and digits make up a word. A name match may not
   // touch one of these on either side.
@@ -350,26 +355,43 @@
     return true;
   }
 
-  // True when text[start] begins a sentence or a line: only opening quotes,
-  // brackets, and spaces sit between it and the text start, a line break, or
-  // a . ! ? or : before it.
+  // True when text[start] opens a sentence: it is at the start of the text,
+  // after a blank line, or after . ! ? or : -- with only spaces, line breaks,
+  // opening quotes, or brackets between. A single line break is not enough,
+  // since PDF text breaks every visual line, and a period after an initial or
+  // a title ("Thanh V. Do", "Dr. He") does not end a sentence.
   function sentenceStart(text, start) {
     var i = start - 1;
-    while (i >= 0 && text[i] !== "\n" && /["'“‘(\[\s]/.test(text[i])) {
+    var breaks = 0;
+    while (i >= 0 && /["'“‘(\[\s]/.test(text[i])) {
+      if (text[i] === "\n") {
+        breaks++;
+      }
       i--;
     }
-    return i < 0 || /[.!?:\n]/.test(text[i]);
+    if (i < 0 || breaks >= 2 || /[!?:]/.test(text[i])) {
+      return true;
+    }
+    if (text[i] !== ".") {
+      return false;
+    }
+    var before = text.slice(Math.max(0, i - 5), i).match(/\p{L}+$/u);
+    return !(before && (before[0].length === 1 || TITLES.test(before[0])));
   }
 
   // A single-word name must be capitalized. A short name that is also a
   // common sentence-opening word ("He", "An", "In", "So", "Do") is not
-  // replaced at the start of a sentence or line, where it is nearly always
-  // the ordinary word ("He grew up poor.", "Do you agree?").
+  // replaced at the start of a sentence, where it is nearly always the
+  // ordinary word ("He grew up poor.", "Do you agree?") -- unless a number
+  // follows it, as in an MLA running head ("Do 2" at the top of a page).
   function singleName(word, text, start) {
     if (!capitalized(word)) {
       return false;
     }
-    return !(OPENERS.test(fold(word)) && sentenceStart(text, start));
+    if (!OPENERS.test(word) || !sentenceStart(text, start)) {
+      return true;
+    }
+    return /^[ \t]+\d/.test(text.slice(start + word.length, start + word.length + 8));
   }
 
   // Replaces each match of pattern (run on the folded text) that accept()

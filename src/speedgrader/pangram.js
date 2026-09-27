@@ -585,8 +585,8 @@
     if (state.status === "ready") {
       body.appendChild(el("p", "", "This is the exact text that will go to Pangram. Student names from " +
         "the course roster are replaced with [name] and email addresses with [email]. Lowercase names, " +
-        "user names, and nicknames that are not on the roster are not replaced, so read the text before " +
-        "you send it. Nothing has been sent yet."));
+        "user names, nicknames that are not on the roster, and a short name such as He or Do at the start " +
+        "of a sentence are not replaced, so read the text before you send it. Nothing has been sent yet."));
       body.appendChild(facts(state.preview));
       body.appendChild(previewText(state.preview.text));
       footer.appendChild(button("Cancel", "", function () {
