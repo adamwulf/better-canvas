@@ -45,6 +45,8 @@ checkAll(roster, [
 ]);
 
 // Accents both ways, ł/ø/ß, and ä/ö/ü as ae/oe/ue.
+var plainRoster = Redact.createRedactor(["Jose Garcia"]);
+assert.strictEqual(plainRoster.redact("José García wrote").text, "[name] wrote");
 checkAll(roster, [
   ["Jose Nunez wrote", "[name] wrote"],
   ["José Núñez wrote", "[name] wrote"],

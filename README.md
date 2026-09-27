@@ -117,7 +117,7 @@ Name matching aims at the usual forms of a name; the editable preview is for
 the rest. From each roster name (display name, sortable name, short name):
 
 - **Whole names match in any case:** the full name, the sortable name without
-  its comma (`Doe Jane Q`), and every pair of its main words in either order
+  its comma (`Doe Jane Q.`), and every pair of its main words in either order
   (`Jane Doe`, `Doe Jane`).
 - **Single name words must be capitalized in the text** (`Jane`, `Doe`, and
   each half of `Mary-Jane`), so ordinary lowercase words (`will`, `may`) stay.

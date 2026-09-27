@@ -10,7 +10,7 @@
 // Each roster name (its display name, sortable name "Doe, Jane Q.", and short
 // name) gives:
 //   - whole names, which match in any case: the full name, the sortable name
-//     without its comma ("Doe Jane Q"), and every pair of its main words in
+//     without its comma ("Doe Jane Q."), and every pair of its main words in
 //     either order ("Jane Doe", "Doe Jane");
 //   - single words, which must be capitalized in the text: each main word and
 //     each half of a hyphenated one ("Jane", "Doe", "Mary" and "Jane" from
@@ -20,8 +20,9 @@
 // parentheses or quotes (a nickname) count too.
 //
 // Names and text are compared with accents removed and letters such as ł, ø,
-// ß spelled out, in both directions ("Jose Nunez" matches "José Núñez"); ä, ö,
-// ü also match ae, oe, ue ("Müller" matches "Mueller"). An apostrophe may be
+// ß spelled out, in both directions ("Jose Nunez" matches "José Núñez"). An ä,
+// ö, or ü in a roster name also matches ae, oe, ue in the text ("Müller"
+// catches "Mueller"; not the reverse). An apostrophe may be
 // any apostrophe mark or left out ("O'Brien", "O’Brien", "OBrien"), a hyphen
 // may be a space or left out ("Do-Hyun", "Do Hyun", "Dohyun"), and the words
 // of a whole name may be joined by a space (one line break at most), a
