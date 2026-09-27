@@ -348,8 +348,16 @@
       var ordered = firstLast(name) || name;
       add(name);
       add(ordered);
-      add(name.replace(/\s*,\s*/, " ")); // surname first, no comma: "Kim Seoyeon"
-      add(surname(name));
+      // Surname first, no comma: "Kim Seoyeon Grace", and the surname with
+      // each given word ("Kim Seoyeon", "Doe Jane" for "Doe, Jane Q.").
+      add(name.replace(/\s*,\s*/, " "));
+      var last = surname(name);
+      if (last) {
+        nameWords(name.slice(name.indexOf(",") + 1)).forEach(function (given) {
+          add(last + " " + given);
+        });
+      }
+      add(last);
       shortForms(ordered).forEach(add);
       // Single words. A lowercase particle inside the name ("van" in "Anna van
       // der Berg") or as half of a hyphenated name ("al" in "al-Farsi") does

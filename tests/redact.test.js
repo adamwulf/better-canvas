@@ -430,6 +430,19 @@ var surnameFirst = Redact.createRedactor([
   assert.strictEqual(surnameFirst.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
 });
 
+// Surname first, with a middle name or initial on the roster.
+var middle = Redact.createRedactor(["Jane Q. Doe", "Doe, Jane Q.", "Seoyeon Grace Kim", "Kim, Seoyeon Grace"]);
+[
+  ["DoeJane_Essay1.docx", "[name]_Essay1.docx"],
+  ["doe_jane_essay.pdf", "[name]_essay.pdf"],
+  ["doejane2026 and doe jane", "[name]2026 and [name]"],
+  ["KimSeoyeon wrote", "[name] wrote"],
+  ["@kimseoyeon2026", "@[name]2026"],
+  ["kim grace wrote", "[name] wrote"]
+].forEach(function (pair) {
+  assert.strictEqual(middle.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
+});
+
 // An empty roster changes nothing but email addresses.
 var empty = Redact.createRedactor([]);
 assert.strictEqual(empty.termCount, 0);
