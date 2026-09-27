@@ -120,7 +120,8 @@ from the sortable form (`van der Berg`), and each part of two or more letters
 inside the name, such as the `van` of `Anna van der Berg` or the `al` of
 `Omar al-Farsi` (a capitalized one, such as the `Le` of `Jia Le Chen`, is
 kept, since it can be a real name syllable). A hyphen in a name also matches
-a space, so `Do-Hyun Kim` catches `Do Hyun Kim`. Accents and letters such as
+a space or nothing, so `Do-Hyun Kim` catches `Do Hyun Kim` and `Dohyun Kim`,
+and `Smith-Jones` catches a lowercase `smith jones`. Accents and letters such as
 ł, ø, and ß are ignored in both directions, so a roster spelling of
 `Jose Nunez` also catches `José Núñez`, and `Müller` also catches `Mueller`
 (and the reverse). A whole

@@ -12,7 +12,9 @@
 // particle that the roster writes in lowercase inside the name ("van" in
 // "Anna van der Berg", "al" in "Omar al-Farsi") is not a term on its own.
 // Suffixes such as "Jr" and "III" are not terms. A hyphen in a term also
-// matches a space, so "Do-Hyun" catches "Do Hyun".
+// matches a space or nothing, so "Do-Hyun" catches "Do Hyun" and "Dohyun",
+// and each hyphenated word is also a whole-name term with spaces, so
+// "Smith-Jones" catches a lowercase "smith jones".
 //
 // Terms and text are compared in a folded form: accents removed and letters
 // such as ł, ø, ß, and ı spelled out in plain Latin letters. So the roster
@@ -102,14 +104,15 @@
   }
 
   // Straight and curly apostrophes are the same character in a name, and a
-  // hyphen may be any hyphen or one space ("Do-Hyun" or "Do Hyun"). The space
-  // inside a whole name may be any run of whitespace with at most one line
-  // break: a name can wrap to the next line, but a blank line ends it.
+  // hyphen may be any hyphen, one space, or nothing ("Do-Hyun", "Do Hyun",
+  // or "Dohyun"). The space inside a whole name may be any run of whitespace
+  // with at most one line break: a name can wrap to the next line, but a
+  // blank line ends it.
   function termPattern(term) {
     return escapeRegExp(term)
       .replace(/['’]/g, "['’]")
       .replace(/ /g, "(?=\\s)[^\\S\\n]*\\n?[^\\S\\n]*")
-      .replace(/[-‐‑]/g, "[-‐‑ ]");
+      .replace(/[-‐‑]/g, "[-‐‑ ]?");
   }
 
   // "Doe, Jane Q." -> "Jane Q. Doe"
@@ -302,6 +305,7 @@
         }
         var halves = word.split(/[-‐‑]/);
         if (halves.length > 1) {
+          add(halves.join(" ")); // "smith jones" for "Smith-Jones", in any case
           halves.forEach(function (half) {
             if (!lowercaseParticle(half)) {
               add(half);

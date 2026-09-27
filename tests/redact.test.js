@@ -174,9 +174,21 @@ var syllables = Redact.createRedactor([
   ["Jia Le wrote", "[name] wrote"],
   ["Al said so", "[name] said so"],
   ["mohamed el sayed wrote", "[name] wrote"],
-  ["El Sayed wrote", "[name] wrote"]
+  ["El Sayed wrote", "[name] wrote"],
+  ["Dohyun Kim wrote", "[name] wrote"],
+  ["Elsayed wrote", "[name] wrote"]
 ].forEach(function (pair) {
   assert.strictEqual(syllables.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
+});
+
+// A hyphenated name part written as two lowercase words.
+var hyphens = Redact.createRedactor(["Emily Smith-Jones", "Ana García-López", "Mary-Kate Olsen"]);
+[
+  ["smith jones wrote", "[name] wrote"],
+  ["garcia lopez wrote", "[name] wrote"],
+  ["mary kate wrote", "[name] wrote"]
+].forEach(function (pair) {
+  assert.strictEqual(hyphens.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
 });
 
 // A lowercase particle inside a roster name, or as half of a hyphenated
