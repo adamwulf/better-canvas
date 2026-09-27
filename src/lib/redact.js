@@ -28,7 +28,9 @@
 // words of a whole name may be joined by an underscore, a dot, or nothing
 // ("Jane_Doe", "jane.doe", "JaneDoe", "delacruz"; see wholeName).
 //
-// A match must stand alone as a word. A whole name (two or more words, such as
+// A match must stand alone as a word: no letter may touch it, but a digit or
+// an underscore may ("@JaneDoe2026"), except for a single-word name of fewer
+// than 4 letters (see singleName). A whole name (two or more words, such as
 // "jane doe" or "van der Berg") matches in any case. A single word must have
 // an upper-case letter ("Doe", "DOE", "deWitt"), or be in a script with no
 // letter case. Names are proper nouns, so this keeps ordinary lowercase words
@@ -55,10 +57,10 @@
   var MAX_SLOTS = 5;
   var JOINED_MIN_LETTERS = 6;
 
-  // Letters, combining marks, and digits make up a word. A name match may not
-  // touch one of these on either side. An underscore is not one, so the names
-  // in "Jane_Doe" still stand alone.
-  var WORD_CHAR = "[\\p{L}\\p{M}\\p{N}]";
+  // Letters and combining marks make up a word. A name match may not touch
+  // one of these on either side. A digit or an underscore may touch it, so
+  // the names in "Jane_Doe" and "@JaneDoe2026" still stand alone.
+  var WORD_CHAR = "[\\p{L}\\p{M}]";
 
   var EMAIL = /[\p{L}\p{N}._%+-]+@[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)+/gu;
 
@@ -408,15 +410,33 @@
     );
   }
 
-  // True when text[start, end) touches a path, URL, file-name, or handle
-  // character: @ / \ or _ before it, / \ or _ after it, or a dot that joins
-  // it to a letter or digit ("seoyeon.kim", "seoyeon.2026").
+  // True when text[start, end) is part of a path, URL, file name, or handle:
+  // the run of non-space characters around it holds an @ / \ _ or =, or a
+  // dot between two letters or digits ("seoyeon-essay.docx", "seoyeon.2026",
+  // "?user=seoyeon").
   function inPathOrHandle(text, start, end) {
-    var before = text[start - 1] || "";
-    var after = text[end] || "";
-    return /[@\/\\_]/.test(before) || /[\/\\_]/.test(after) ||
-      (before === "." && /[\p{L}\p{N}]/u.test(text[start - 2] || "")) ||
-      (after === "." && /[\p{L}\p{N}]/u.test(text[end + 1] || ""));
+    var from = start;
+    var to = end;
+    while (from > 0 && !/\s/.test(text[from - 1])) {
+      from--;
+    }
+    while (to < text.length && !/\s/.test(text[to])) {
+      to++;
+    }
+    var token = text.slice(from, to);
+    return /[@\/\\_=]/.test(token) || /[\p{L}\p{N}]\.[\p{L}\p{N}]/u.test(token);
+  }
+
+  // A single-word name must be capitalized. One of fewer than 4 letters that
+  // touches a digit is more likely a chemical formula or a code ("Li2O" for a
+  // student named Li) than a name, so it is kept.
+  function singleName(word, text, start) {
+    if (!capitalized(word)) {
+      return false;
+    }
+    var end = start + word.length;
+    return letterCount(word) >= 4 ||
+      !(/\p{N}/u.test(text[start - 1] || "") || /\p{N}/u.test(text[end] || ""));
   }
 
   // Replaces each match of pattern (run on the folded text) that accept()
@@ -492,7 +512,7 @@
         });
       }
       var wholePass = replaceTerms(current, wholeNames, wholeName);
-      var singlePass = replaceTerms(wholePass.text, singleWords, capitalized);
+      var singlePass = replaceTerms(wholePass.text, singleWords, singleName);
       return {
         // "Jane Doe" may become "[name] [name]"; one person reads as one mark.
         text: singlePass.text.replace(/\[name\](?:[ \t]+\[name\])+/g, NAME_MARK),

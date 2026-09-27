@@ -140,9 +140,13 @@ into one word are also caught when capitalized (`Subin` for `Su Bin Park`,
 lowercase-single-name rule below. A whole name joined in all lowercase needs
 6 or more letters (so `anle` is not taken for a word). When it is only the two halves of one hyphenated name, it may be an
 ordinary word (`wanting` for `Wan-Ting`), so in prose it is kept, but in a
-path, URL, file name, or handle it is replaced (`/Users/seoyeon/`,
-`@annemarie`, `maryjane_essay.pdf`); `Wanting` with a capital is always
-replaced. A whole
+path, URL, file name, or handle it is replaced (any non-space run with
+`@ / \ _ =` or a dot between letters or digits: `/Users/seoyeon/`,
+`@annemarie`, `maryjane-essay.pdf`, `?user=seoyeon`); `Wanting` with a
+capital is always replaced. A name may touch a digit (`@JaneDoe2026`,
+`janedoe99`), except a single-word name of fewer than 4 letters, which next
+to a digit is more likely a formula or a code (`Li2O` for a student named
+Li). A whole
 name (two or more words) matches in any case, such as `jane doe`. A single
 word must have a capital letter (`Doe`, `DOE`, `deWitt`) or be in a script
 with no letter case, so ordinary lowercase words stay intact when a student

@@ -373,10 +373,38 @@ var handles = Redact.createRedactor(["Seo-Yeon Kim", "Jean-Luc Picard", "Anne-Ma
   ["maryjane_essay.pdf", "[name]_essay.pdf"],
   ["seoyeon.kim.2026", "[name].2026"], // the whole name, joined by a dot
   ["seoyeon.2026", "[name].2026"],
+  ["seoyeon-essay.docx", "[name]-essay.docx"],
+  ["maryjane-final.pdf", "[name]-final.pdf"],
+  ["annemarie-portfolio.com", "[name]-portfolio.com"],
+  ["annemarie-2026.docx", "[name]-2026.docx"],
+  ["seoyeon-hw3.py", "[name]-hw3.py"],
+  ["site.edu/?user=seoyeon", "site.edu/?user=[name]"],
+  ["see ?user=seoyeon now", "see ?user=[name] now"],
   // In prose, a lowercase one-word form stays, like other lowercase names.
   ["seoyeon said so", "seoyeon said so"]
 ].forEach(function (pair) {
   assert.strictEqual(handles.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
+});
+var prose = Redact.createRedactor(["Wan-Ting Li", "Wei Li"]);
+[
+  "I was wanting more.", "wanting-to-go", "wanting... and wanting.", "a wanting-to-please attitude",
+  // A short name next to a digit is a formula, not a name.
+  "Li2O and LiCl are salts; Li2CO3 too."
+].forEach(function (text) {
+  assert.strictEqual(prose.redact(text).text, text, JSON.stringify(text));
+});
+assert.strictEqual(prose.redact("@WeiLi2026 and Li wrote").text, "@[name]2026 and [name] wrote");
+
+// A name may touch a digit, as in a handle or user name.
+var digits = Redact.createRedactor(["Jane Q. Doe"]);
+[
+  ["@JaneDoe2026", "@[name]2026"],
+  ["github.com/janedoe99", "github.com/[name]99"],
+  ["jane.doe23", "[name]23"],
+  ["Jane2026 wrote", "[name]2026 wrote"],
+  ["Doe2 wrote", "Doe2 wrote"] // a short name next to a digit is kept
+].forEach(function (pair) {
+  assert.strictEqual(digits.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
 });
 
 // An empty roster changes nothing but email addresses.
