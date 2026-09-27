@@ -7,8 +7,9 @@
 //   - a text entry: the HTML body from the Canvas API
 //   - a .docx file: word/document.xml, read from the ZIP with the browser's
 //     own DecompressionStream (no library)
-//   - a .pdf file: the text layer, read with the bundled pdf.js
-//     (vendor/pdfjs, loaded only when a PDF is checked)
+//   - a .pdf file: the text layer, read with the bundled pdf.js legacy build
+//     (vendor/pdfjs, loaded only when a PDF is checked; its polyfills cover
+//     the newest JavaScript features that pdf.js 6 uses)
 //   - a .txt file: the bytes as UTF-8
 //
 // All of this runs in the browser; nothing here sends data anywhere.

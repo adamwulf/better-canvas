@@ -218,10 +218,11 @@ is stored only in this browser. Each check uses Pangram API credits.
   a small ZIP reader plus the browser's `DecompressionStream` to get
   `word/document.xml`, then a walk of its `w:t` runs (skipping deleted text,
   field codes, and the duplicate fallback copy of text boxes); for `.pdf`,
-  the bundled [pdf.js](https://mozilla.github.io/pdf.js/) (`vendor/pdfjs`,
-  pdfjs-dist 6.3.289, loaded only when a PDF is checked, parsed on the page
-  thread because a worker from the extension would be cross-origin). A `.docx`
-  whose document text would expand past 50 MB is refused.
+  the bundled [pdf.js](https://mozilla.github.io/pdf.js/) (`vendor/pdfjs`, the
+  pdfjs-dist 6.3.289 legacy build, whose polyfills cover the newest JavaScript
+  features pdf.js uses; loaded only when a PDF is checked, and parsed on the
+  page thread because a worker from the extension would be cross-origin). A
+  `.docx` whose document text would expand past 50 MB is refused.
   The roster comes from
   `GET /api/v1/courses/:id/users?enrollment_type[]=student` (all enrollment
   states, every page), and `src/lib/redact.js` replaces names and email
@@ -263,7 +264,7 @@ icon on the extension card, then reload the Canvas tab.
 manifest.json                   MV3 manifest
 icons/                          extension icons (16 / 48 / 128)
 assets/                         tab favicon PNGs (16 / 32 / 48)
-vendor/pdfjs/                   pdf.js 6.3.289 build + LICENSE (PDF text)
+vendor/pdfjs/                   pdf.js 6.3.289 legacy build + LICENSE (PDF text)
 src/
   favicon/favicon.js            swaps the tab favicon
   lib/terms.js                  term parsing (season/year/sub-term)
