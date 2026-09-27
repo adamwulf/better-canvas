@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Better Canvas (Rice) options</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <h1>Pangram API key</h1>
+  <p>
+    The <strong>Check with Pangram</strong> button in SpeedGrader uses this key.
+    Make a key in your Pangram account. The key is saved only in this browser.
+  </p>
+  <form id="key-form">
+    <label for="api-key">API key</label>
+    <input id="api-key" type="password" autocomplete="off" spellcheck="false">
+    <div class="actions">
+      <button type="submit">Save</button>
+      <button type="button" id="remove-key">Remove</button>
+    </div>
+  </form>
+  <p id="status" role="status"></p>
+  <script src="options.js"></script>
+</body>
+</html>

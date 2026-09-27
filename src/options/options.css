@@ -1,0 +1,51 @@
+/* Better Canvas (Rice) — options page (shown inside chrome://extensions). */
+
+body {
+  font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: #1f2430;
+  margin: 16px 20px 20px;
+  min-width: 380px;
+}
+h1 {
+  font-size: 16px;
+  margin: 0 0 8px;
+}
+p {
+  margin: 0 0 12px;
+}
+label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+input {
+  box-sizing: border-box;
+  width: 100%;
+  font: inherit;
+  padding: 6px 8px;
+  border: 1px solid #b8bfcc;
+  border-radius: 6px;
+}
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+button {
+  font: inherit;
+  font-weight: 600;
+  padding: 5px 14px;
+  border-radius: 6px;
+  border: 1px solid #b8bfcc;
+  background: #f4f6fa;
+  cursor: pointer;
+}
+button[type="submit"] {
+  color: #fff;
+  border-color: #2b5586;
+  background: #2b5586;
+}
+#status {
+  margin-top: 12px;
+  color: #3d4657;
+}

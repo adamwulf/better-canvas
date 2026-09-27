@@ -8,6 +8,15 @@
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
+  "permissions": ["storage"],
+  "host_permissions": ["https://text.external-api.pangram.com/*"],
+  "background": {
+    "service_worker": "src/background/service-worker.js"
+  },
+  "options_ui": {
+    "page": "src/options/options.html",
+    "open_in_tab": false
+  },
   "content_scripts": [
     {
       "matches": ["*://canvas.rice.edu/*", "*://hq.globaltech.org/*"],
@@ -61,6 +70,20 @@
       "all_frames": false
     },
     {
+      "matches": [
+        "*://canvas.rice.edu/courses/*/gradebook/speed_grader*",
+        "*://hq.globaltech.org/courses/*/gradebook/speed_grader*"
+      ],
+      "js": [
+        "src/lib/redact.js",
+        "src/speedgrader/submission-text.js",
+        "src/speedgrader/pangram.js"
+      ],
+      "css": ["src/speedgrader/pangram.css"],
+      "run_at": "document_idle",
+      "all_frames": false
+    },
+    {
       "matches": ["*://esther.rice.edu/selfserve/swkrost*"],
       "js": ["src/flashcards/flashcards.js"],
       "css": ["src/flashcards/flashcards.css"],
@@ -75,6 +98,10 @@
         "assets/canvas-favicon-32.png",
         "assets/canvas-favicon-48.png"
       ],
+      "matches": ["*://canvas.rice.edu/*", "*://hq.globaltech.org/*"]
+    },
+    {
+      "resources": ["vendor/pdfjs/pdf.min.mjs", "vendor/pdfjs/pdf.worker.min.mjs"],
       "matches": ["*://canvas.rice.edu/*", "*://hq.globaltech.org/*"]
     }
   ]
