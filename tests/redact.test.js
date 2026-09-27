@@ -443,6 +443,24 @@ var middle = Redact.createRedactor(["Jane Q. Doe", "Doe, Jane Q.", "Seoyeon Grac
   assert.strictEqual(middle.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
 });
 
+// Surname first with one part of a compound or particle surname.
+var compound = Redact.createRedactor([
+  "Maria Garcia-Lopez", "Garcia-Lopez, Maria", "Sofia de la Cruz", "de la Cruz, Sofia"
+]);
+[
+  ["GarciaMaria_essay.docx", "[name]_essay.docx"],
+  ["garcia_maria_essay.pdf", "[name]_essay.pdf"],
+  ["LopezMaria wrote", "[name] wrote"],
+  ["CruzSofia.pdf and cruz_sofia.pdf", "[name].pdf and [name].pdf"],
+  ["delacruz_sofia wrote", "[name] wrote"]
+].forEach(function (pair) {
+  assert.strictEqual(compound.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
+});
+
+// A short surname-first name with no letter case is always a name.
+var han = Redact.createRedactor(["伟 张", "张, 伟"]);
+assert.strictEqual(han.redact("张伟 wrote").text, "[name] wrote");
+
 // A short surname-first join in Title Case may be an English word.
 var reversedWords = Redact.createRedactor(["Ke Li", "Li, Ke", "Man Hu", "Hu, Man", "An Le", "Le, An", "Han Wu", "Wu, Han"]);
 [

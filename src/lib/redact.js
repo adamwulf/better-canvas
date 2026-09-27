@@ -350,13 +350,24 @@
       var ordered = firstLast(name) || name;
       add(name);
       add(ordered);
-      // Surname first, no comma: "Kim Seoyeon Grace", and the surname with
-      // each given word ("Kim Seoyeon", "Doe Jane" for "Doe, Jane Q.").
+      // Surname first, no comma: "Kim Seoyeon Grace", and the surname -- and
+      // each part of a compound or particle surname, with or without its
+      // particles -- with each given word ("Kim Seoyeon", "Doe Jane" for
+      // "Doe, Jane Q.", "Garcia Maria" for "Garcia-Lopez, Maria", "Cruz
+      // Sofia" for "de la Cruz, Sofia").
       var reversed = [name.replace(/\s*,\s*/, " ")];
       var last = surname(name);
       if (last) {
+        var lastForms = [last];
+        nameSlots(nameWords(last)).forEach(function (slot) {
+          slot.forEach(function (unit) {
+            lastForms.push(unit.full, unit.bare);
+          });
+        });
         nameWords(name.slice(name.indexOf(",") + 1)).forEach(function (given) {
-          reversed.push(last + " " + given);
+          lastForms.forEach(function (lastForm) {
+            reversed.push(lastForm + " " + given);
+          });
         });
       }
       reversed.forEach(function (form) {
@@ -518,9 +529,12 @@
       }
       var key = fold(match).toLowerCase();
       if (capitalized(match)) {
-        // CamelCase means a capital after a lowercase letter ("LiKe"); an
-        // all-caps heading ("LIKE WATER FOR CHOCOLATE") is not.
-        return !terms.reversedShort[key] || /\p{Ll}\p{Lu}/u.test(match);
+        // Only a cased join can spell an English word. CamelCase means a
+        // capital after a lowercase letter ("LiKe"); an all-caps heading
+        // ("LIKE WATER FOR CHOCOLATE") is not. A name with no letter case
+        // ("张伟") is always a name.
+        return !terms.reversedShort[key] || !/[\p{Lu}\p{Ll}]/u.test(match) ||
+          /\p{Ll}\p{Lu}/u.test(match);
       }
       return letterCount(match) >= JOINED_MIN_LETTERS && !terms.joinedHalves[key];
     }

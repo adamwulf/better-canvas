@@ -113,8 +113,10 @@ submission details. **Check with Pangram** checks the student on screen with
    segment — and as a one-line summary in the grading panel.
 
 Name matching covers each roster name, its sortable form (`Doe, Jane Q.`),
-the surname-first forms without the comma (`Doe Jane Q`, and the surname
-with each given word: `Doe Jane`, `Kim Grace` for `Kim, Seoyeon Grace`), its
+the surname-first forms without the comma (`Doe Jane Q`, and the surname,
+or each part of a compound or particle surname, with each given word:
+`Doe Jane`, `Kim Grace` for `Kim, Seoyeon Grace`, `Garcia Maria` for
+`Garcia-Lopez, Maria`, `Cruz Sofia` for `de la Cruz, Sofia`), its
 short name, its shorter forms (`Jane Doe` for `Jane Q. Doe`, `Maria Garcia`
 for `Maria Garcia Lopez`, `Ana da Silva` for `Ana Maria Da Silva`, `Kevin Le`
 for `Kevin Minh Le`, `Ana García` for `Ana García-López`; a particle such as
