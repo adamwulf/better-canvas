@@ -72,15 +72,11 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: 8px 0 0;
+  margin: 0 0 8px;
   font-size: 13px;
   font-weight: 400;
   color: #5a6475;
   cursor: pointer;
-}
-/* Before a check the checkbox sits under the title, above the buttons. */
-.bc-pg-section .bc-pg-section-title + .bc-pg-option {
-  margin: 0 0 8px;
 }
 .bc-pg-section .bc-pg-option.bc-pg-option-off {
   opacity: 0.5;

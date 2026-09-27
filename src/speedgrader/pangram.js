@@ -603,7 +603,6 @@
         section.appendChild(notes);
       }
       sectionRow(section).appendChild(button("Details", "bc-pg-link", forStudent(target.key, showDialog)));
-      section.appendChild(previewOption()); // the mode "Check again" in Details uses
       return;
     }
 
