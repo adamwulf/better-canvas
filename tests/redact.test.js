@@ -105,6 +105,22 @@ assert.strictEqual(common.redact("Doe and Haas").text, "[name] and [name]");
 check("john smith\nENTR 222", "[name]\nENTR 222");
 check("maria garcia wrote", "[name] wrote");
 
+// Longer names: groups of main words, and runs that keep their particles.
+var long = Redact.createRedactor([
+  "María José García López", "Ana Maria Da Silva", "Tran Minh Anh Nguyen", "Maria De La Cruz"
+]);
+[
+  ["maría josé garcía wrote", "[name] wrote"],
+  ["maría garcía lópez wrote", "[name] wrote"],
+  ["maria da silva wrote", "[name] wrote"],
+  ["minh anh nguyen wrote", "[name] wrote"],
+  ["maria de la cruz wrote", "[name] wrote"],
+  // Capitalized particles on the roster do not make "de la" a name.
+  ["de la mancha, de los santos, van der waals", "de la mancha, de los santos, van der waals"]
+].forEach(function (pair) {
+  assert.strictEqual(long.redact(pair[0]).text, pair[1], JSON.stringify(pair[0]));
+});
+
 // The index map handles multi-unit folds, surrogate pairs, and combining
 // marks that NFC cannot compose.
 check("Strauß's essay", "[name]'s essay");

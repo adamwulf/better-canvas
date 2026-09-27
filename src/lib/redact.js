@@ -5,10 +5,10 @@
 // and every email address with "[email]".
 //
 // A roster name such as "Jane Q. Doe" (plus its sortable form "Doe, Jane Q."
-// and its short name) becomes a set of terms: each whole name, each ordered
-// pair of its capitalized words ("Jane Doe"), the surname from the sortable
-// form ("van der Berg"), and each part of two or more letters ("Jane", "Doe",
-// the halves of a hyphenated name, a nickname in parentheses or quotes).
+// and its short name) becomes a set of terms: each whole name, its shorter
+// forms ("Jane Doe"; see shortForms), the surname from the sortable form
+// ("van der Berg"), and each part of two or more letters ("Jane", "Doe", the
+// halves of a hyphenated name, a nickname in parentheses or quotes).
 // Suffixes such as "Jr" and "III" are not terms.
 //
 // Terms and text are compared in a folded form: accents removed and letters
@@ -36,6 +36,8 @@
   var EMAIL_MARK = "[email]";
   var MIN_LETTERS = 2;
   var SUFFIX = /^(?:jr|sr|ii|iii|iv)$/i;
+  var PARTICLE = /^(?:al|bin|ibn|da|das|de|del|della|den|der|di|do|dos|du|el|la|las|le|les|lo|los|ten|ter|van|von|zu)$/i;
+  var MAX_MAIN_WORDS = 5;
 
   // Letters, combining marks, and digits make up a word. A name match may not
   // touch one of these on either side.
@@ -134,22 +136,52 @@
     return /\p{Lu}/u.test(word) || !/[\p{Lu}\p{Ll}\p{Lt}]/u.test(word);
   }
 
-  // Every ordered pair of capitalized name words: "Jane Doe" for "Jane Q.
-  // Doe", "John Smith" for "John Smith III", "Maria Garcia" and "Maria Lopez"
-  // for "Maria Garcia Lopez", "David Zhang" for "Wei (David) Zhang". This is
-  // how a student often writes a roster name in a paper. Particles ("de"),
-  // initials, and suffixes are left out.
-  function wordPairs(name) {
+  // The shorter forms of a name that a student often writes in a paper. The
+  // main words are the capitalized ones that are not particles; initials and
+  // suffixes are left out. The forms are:
+  //   - every ordered group of two or more main words: "Jane Doe" for
+  //     "Jane Q. Doe", "John Smith" for "John Smith III", "María García
+  //     López" for "María José García López", "David Zhang" for
+  //     "Wei (David) Zhang" (only pairs for a name with more than 5 main
+  //     words, to keep the term list small);
+  //   - every run of the name's own words that starts and ends on a main
+  //     word, so particles inside it stay: "Maria Da Silva" for
+  //     "Ana Maria Da Silva".
+  // A particle is never part of a group on its own, so "de la" or "van der"
+  // in a paper is never taken for a name.
+  function shortForms(name) {
     var words = name.split(PART_SPLIT).map(trimEdges).filter(function (word) {
-      return letterCount(word) >= MIN_LETTERS && !SUFFIX.test(word) && capitalized(word);
+      return letterCount(word) >= MIN_LETTERS && !SUFFIX.test(word);
     });
-    var pairs = [];
-    for (var i = 0; i < words.length; i++) {
-      for (var j = i + 1; j < words.length; j++) {
-        pairs.push(words[i] + " " + words[j]);
+    function isMain(word) {
+      return capitalized(word) && !PARTICLE.test(word);
+    }
+    var main = words.filter(isMain);
+    var forms = [];
+    if (main.length <= MAX_MAIN_WORDS) {
+      for (var mask = 1; mask < (1 << main.length); mask++) {
+        var group = main.filter(function (word, index) {
+          return mask & (1 << index);
+        });
+        if (group.length >= 2) {
+          forms.push(group.join(" "));
+        }
+      }
+    } else {
+      for (var a = 0; a < main.length; a++) {
+        for (var b = a + 1; b < main.length; b++) {
+          forms.push(main[a] + " " + main[b]);
+        }
       }
     }
-    return pairs;
+    for (var i = 0; i < words.length; i++) {
+      for (var j = i + 2; j < words.length && isMain(words[i]); j++) {
+        if (isMain(words[j])) {
+          forms.push(words.slice(i, j + 1).join(" "));
+        }
+      }
+    }
+    return forms;
   }
 
   // The second common spelling of ä, ö, ü, å, and ø ("Müller" and "Mueller"),
@@ -204,7 +236,7 @@
       add(name);
       add(ordered);
       add(surname(name));
-      wordPairs(ordered).forEach(add);
+      shortForms(ordered).forEach(add);
       name.split(PART_SPLIT).forEach(function (part) {
         add(part);
         part.split(/[-‐‑]/).forEach(add);
