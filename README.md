@@ -105,12 +105,14 @@ submission details. It checks the student on screen with
    roster NetID (the Canvas login ID, such as `jd45`; for a login ID in email
    form, its part before the `@`) with `[netid]`, and every email address
    with `[email]`.
-3. A dialog shows the redacted text in an editable box, with how many names,
-   NetIDs, and email addresses were replaced. Read it and remove anything the
-   rules missed. **Nothing is sent until you click Send to Pangram**, and what
-   is sent is exactly what the box holds. If Canvas does not share the
-   roster's login IDs with you, the dialog says that NetIDs were not replaced.
-   Close the dialog to keep the text; **Review text** opens it again.
+3. The box says **Text prepared**; no dialog opens by itself. **Details**
+   opens a dialog with the redacted text in an editable box, and how many
+   names, NetIDs, and email addresses were replaced. Read it and remove
+   anything the rules missed. **Nothing is sent until you click Send to
+   Pangram**, and what is sent is exactly what the box holds. If Canvas does
+   not share the roster's login IDs with you, the dialog says that NetIDs
+   were not replaced. Close the dialog to keep the text; **Details** opens it
+   again.
 4. **Send to Pangram** (in the dialog or in the box) closes the dialog. The
    box shows the progress, then Pangram's verdict and the AI, AI-assisted,
    and human percentages, one per line, with the largest in bold. The box

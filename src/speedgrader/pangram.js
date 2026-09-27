@@ -16,14 +16,16 @@
 //      Canvas login_id) with "[netid]", and every email address with
 //      "[email]" (BetterCanvasRedact). If the roster cannot load, the check
 //      stops here and nothing is sent.
-//   5. Show the redacted text in an editable box in a dialog, where the
-//      grader removes anything the rules missed. Nothing leaves the browser
-//      until "Send to Pangram" is clicked.
+//   5. Show "Text prepared" in the section. No dialog opens by itself:
+//      "Details" opens the redacted text in an editable box in a dialog,
+//      where the grader removes anything the rules missed. Nothing leaves
+//      the browser until "Send to Pangram" is clicked.
 //
 // "Send to Pangram", in the dialog or in the section, closes the dialog, and
 // the background worker sends only the text in that box to Pangram. The
 // section shows the progress and then the result; "Details" opens the result
-// in the dialog, with the text colored by segment.
+// in the dialog, with the text colored by segment. The dialog's "Check again"
+// closes it and prepares the text again in the section.
 //
 // With "Send without preview" checked, the section shows only "Send to
 // Pangram", which prepares the text (steps 1-4) and sends it at once, with no
@@ -87,8 +89,8 @@
   }
 
   // The second click of a double-click is ignored: the first click often
-  // opens the dialog or swaps its buttons, and the second would then land on
-  // the backdrop or on a new button (such as "Close" where "Send" was).
+  // opens or closes the dialog or redraws the section, and the second would
+  // then land on the backdrop or on a new button.
   function button(label, className, onClick) {
     var node = el("button", "bc-pg-button " + (className || ""), label);
     node.type = "button";
@@ -356,15 +358,12 @@
     renderDialog();
   }
 
-  // Gets the submission text and redacts it. Without thenSend the dialog
-  // opens and then shows the text for review; with thenSend there is no
-  // dialog and the text goes to Pangram as soon as it is ready.
+  // Gets the submission text and redacts it. No dialog opens: the section
+  // shows the progress, and then "Details" opens the text for review. With
+  // thenSend the text goes to Pangram as soon as it is ready.
   function prepare(target, thenSend) {
     var state = stateFor(target.key);
     update(state, { status: "preparing", error: "", needsKey: false, result: null, preview: null });
-    if (!thenSend) {
-      openDialog(target.key);
-    }
 
     // The key check runs first: it also starts the background worker, which
     // locks the key away from content scripts before any student file is
@@ -547,13 +546,14 @@
     return row;
   }
 
-  // Step 1 prepares the text (or reopens it for review once it is ready);
-  // step 2 sends it, and is off until there is text to send.
+  // Step 1 prepares the text (once it is ready, "Details" opens it for
+  // review); step 2 sends it, and is off until there is text to send.
   function fillSteps(section, target, state) {
     var first = sectionRow(section);
     first.appendChild(el("span", "bc-pg-step-number", "1."));
     if (state.preview) {
-      first.appendChild(button("Review text", "", forStudent(target.key, reviewText)));
+      first.appendChild(el("span", "", "Text prepared"));
+      first.appendChild(button("Details", "bc-pg-link", forStudent(target.key, reviewText)));
     } else {
       first.appendChild(button("Prepare text for Pangram", "bc-pg-primary", forStudent(target.key, prepare)));
     }
@@ -765,11 +765,6 @@
     var attempt = state.attempt ? " (attempt " + state.attempt + ")" : "";
     dialog.title.textContent = "Pangram check" + attempt;
 
-    if (state.status === "preparing") {
-      body.appendChild(el("p", "bc-pg-busy", "Getting the submission text and removing names…"));
-      footer.appendChild(button("Close", "", closeDialog));
-      return;
-    }
     if (state.status === "ready") {
       var netIdText = state.preview.idsKnown ? ", NetIDs with [netid]," : "";
       body.appendChild(el("p", "", "This text goes to Pangram when you click Send. Roster names are " +
@@ -802,24 +797,15 @@
       footer.appendChild(button(sendWithoutPreview ? "Send to Pangram again" : "Check again", "", function () {
         var target = currentTarget();
         if (target && target.key === state.key) {
-          if (sendWithoutPreview) {
-            closeDialog(); // the section shows this check
-          }
+          closeDialog(); // the section shows this check
           prepare(target, sendWithoutPreview);
         }
       }));
       footer.appendChild(button("Close", "bc-pg-primary", closeDialog));
       return;
     }
-    if (state.status === "error") {
-      body.appendChild(el("p", "bc-pg-error", state.error));
-      if (state.needsKey) {
-        footer.appendChild(button("Open options", "bc-pg-primary", openOptions));
-      }
-      footer.appendChild(button("Close", "", closeDialog));
-      return;
-    }
-    // idle or checking: the section shows these, not the dialog.
+    // idle, preparing, checking, or error: the section shows these, not the
+    // dialog.
     closeDialog();
   }
 
