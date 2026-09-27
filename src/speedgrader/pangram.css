@@ -189,10 +189,6 @@
 .bc-pg-busy {
   font-weight: 600;
 }
-.bc-pg-error {
-  color: #b3261e;
-  font-weight: 600;
-}
 
 .bc-pg-dialog .bc-pg-facts {
   margin: 0 0 12px;
