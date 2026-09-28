@@ -308,7 +308,9 @@ session. The one exception to "no third party" is the Pangram check: when you
 click **Send to Pangram** (or **Send to Pangram again**), and only then, the
 redacted text goes to Pangram's API — as you left it in the preview box, or
 straight from redaction with **Send without preview** checked. No file, file
-name, or Canvas ID is sent with it.
+name, or Canvas ID is sent with it. The Pangram API also gets the key alone,
+with no text, in the `GET /models` call: once before each check with
+**Newest** picked, and each time the options page opens with a key saved.
 
 ## Install (load unpacked)
 

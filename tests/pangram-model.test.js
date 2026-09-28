@@ -86,6 +86,16 @@ Promise.resolve()
   .then(function (value) {
     assert.strictEqual(value.model, "default");
     assert.strictEqual(sentModel(), "default");
+    // Newest picked on the options page, which saves "": as with no pick.
+    stored.sync.pangramModel = "";
+    listed.models = ["default", "pangram-4"];
+    requests = [];
+    return context.createTask("some text");
+  })
+  .then(function (value) {
+    assert.strictEqual(value.model, "pangram-4");
+    assert.ok(/\/models$/.test(requests[0].url), "GET /models first");
+    assert.strictEqual(sentModel(), "pangram-4");
     // A model picked on the options page is sent as is, with no GET /models.
     stored.sync.pangramModel = "pangram-3.3.2";
     requests = [];
