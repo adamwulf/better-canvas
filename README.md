@@ -161,9 +161,21 @@ new check, and its result replaces the saved one. The check always reads the
 student's latest attempt, so a new attempt with new text gets a new check.
 **Delete saved results** on the options page removes them all.
 
+Each result, new or saved, shows the model that scored it: the model name
+the check sent and the version Pangram reports (`Model: pangram-4 (version
+4.0)`). A result saved before model names were kept shows only the version.
+
 **Setup:** make an API key in your Pangram account, then open the extension's
 **Details → Extension options** on `chrome://extensions` and save the key. It
 is stored only in this browser. Each check uses Pangram API credits.
+
+**Model:** the options page lists the models your key can use. **Newest**
+(the default) asks Pangram at each check and sends the `pangram-<number>`
+model with the highest number (`pangram-4.1` over `pangram-4`); if no model
+has that form, it sends `default`. Pangram's `default` model can be older
+than its newest one, and then its scores differ from the Pangram dashboard.
+Pick a model by name to always send that one. The pick is saved in Chrome's
+synced extension storage.
 
 ## How it works
 
@@ -268,18 +280,21 @@ is stored only in this browser. Each check uses Pangram API credits.
   sent.
   After you click **Send to Pangram**, the redacted text goes to the
   background service worker (`src/background/service-worker.js`), which calls
-  `POST https://text.external-api.pangram.com/task` with the saved key and
-  the `pangram-4` model, then `GET /task/:id` once per content-script message
-  until the task finishes. Each check also writes diagnostic lines to the
-  worker's console (`GET /models`, the text sent, and Pangram's full answer);
-  open them with **service worker** on the extension card at
-  `chrome://extensions`. The key stays in `chrome.storage.local`, which the worker limits
+  `POST https://text.external-api.pangram.com/task` with the saved key and a
+  model, then `GET /task/:id` once per content-script message until the task
+  finishes. The model is the `pangramModel` pick in `chrome.storage.sync`; an
+  empty pick (**Newest**) means the worker calls `GET /models` first and
+  sends the `pangram-<number>` selector with the highest number, comparing
+  each dot part as a number, or `default` if none has that form. The options
+  page gets its model menu from the same `GET /models` call, through the
+  worker. The key stays in `chrome.storage.local`, which the worker limits
   to extension pages; the options page (`src/options/`) saves or removes it.
   The **Send without preview** setting is one flag in `chrome.storage.sync`.
   Each finished check is saved in `chrome.storage.local` through the worker
   (the content script cannot reach that area), as
-  `pangramResult:<SHA-256 of the joined text>`: Pangram's result, the
-  replacement counts, and the time of the check. The `unlimitedStorage`
+  `pangramResult:<SHA-256 of the joined text>`: Pangram's result (with its
+  `version`), the model selector sent, the replacement counts, and the time
+  of the check. The `unlimitedStorage`
   permission lifts that area's 10 MB limit. The worker's status answer also
   says whether any result is saved; only then does the script read each
   student's submission, when it comes up, to look for its saved result.
@@ -334,9 +349,10 @@ src/
   speedgrader/pangram.css       section + dialog styling
   speedgrader/submission-text.js  text from text entries, PDF, DOCX, TXT
   background/service-worker.js  holds the API key, calls the Pangram API
-  options/                      options page for the Pangram API key
+  options/                      options page for the Pangram API key and model
 tests/
   face-photo-download.test.js   filename and ZIP-format tests
+  pangram-model.test.js         Pangram model choice (newest pangram-<number>)
   redact.test.js                name and email redaction tests
   submission-text.test.js       file-type and DOCX ZIP-reader tests
 ```

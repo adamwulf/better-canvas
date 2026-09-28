@@ -16,6 +16,11 @@
 // drives the polling with one message per poll, because a pending timer does
 // not keep an MV3 service worker alive but each incoming message does.
 //
+// Each check sends the model picked on the options page. The default pick,
+// "Newest", asks GET /models at each check and sends the "pangram-<number>"
+// selector with the highest number. Pangram's own "default" selector can lag
+// behind its newest model, and then its scores differ from the dashboard's.
+//
 // Check results are saved in the same area, so the content script also reads
 // and writes them through this worker. Each result is stored under
 // "pangramResult:" plus the SHA-256 hash of the submission text it is for, and
@@ -24,7 +29,9 @@
 "use strict";
 
 var API_BASE = "https://text.external-api.pangram.com";
-var MODEL = "pangram-4"; // a selector from GET /models; "default" may differ from the dashboard
+var MODEL_SETTING = "pangramModel"; // chrome.storage.sync; set on the options page, "" means newest
+var NUMBERED_MODEL = /^pangram-(\d+(?:\.\d+)*)$/;
+var FALLBACK_MODEL = "default"; // when GET /models has no "pangram-<number>" selector
 var KEY_NAME = "pangramApiKey";
 var RESULT_PREFIX = "pangramResult:"; // the options page deletes these too
 var TEXT_HASH = /^[0-9a-f]{64}$/;
@@ -91,75 +98,81 @@ function callApi(path, init) {
   });
 }
 
-// Diagnostic log lines go to this worker's console: on chrome://extensions,
-// click "service worker" on the extension card. They hold the redacted text
-// Pangram scored, which stays in this browser.
-function logInfo(label, value) {
-  console.info("[BetterCanvas] Pangram " + label, value);
-}
-
-// The model selectors this key may use, logged with each check (the console
-// keeps nothing from before it opens), to compare with the model version in
-// each result.
-function logModels() {
-  callApi("/models", { method: "GET" }).then(
-    function (data) {
-      logInfo("GET /models", data);
-    },
-    function (err) {
-      console.warn("[BetterCanvas] Pangram GET /models failed", err);
-    }
-  );
-}
-
-// A finished task: a one-line summary, one table row per scored window, and
-// the full answer.
-function logResult(taskId, data) {
-  logInfo("task " + taskId + " " + data.stage, {
-    version: data.version,
-    headline: data.headline,
-    prediction_short: data.prediction_short,
-    fraction_ai: data.fraction_ai,
-    fraction_ai_assisted: data.fraction_ai_assisted,
-    fraction_human: data.fraction_human
+// The model selectors the saved key can use (GET /models), in Pangram's order.
+function listModels() {
+  return callApi("/models", { method: "GET" }).then(function (data) {
+    var models = data && Array.isArray(data.models) ? data.models : [];
+    return models.filter(function (name) {
+      return typeof name === "string" && name !== "";
+    });
   });
-  console.table((data.windows || []).map(function (win) {
-    return {
-      label: win.label,
-      ai_assistance_score: win.ai_assistance_score,
-      confidence: win.confidence,
-      is_humanized: win.is_humanized,
-      humanizer_score: win.humanizer_score,
-      word_count: win.word_count
-    };
-  }));
-  logInfo("task " + taskId + " full answer", data);
 }
 
-function createTask(text) {
-  var body = { text: text, model: MODEL, public_dashboard_link: false };
-  logModels();
-  logInfo("POST /task", { model: body.model, characters: text.length, text: text });
-  return callApi("/task", {
-    method: "POST",
-    body: JSON.stringify(body)
-  }).then(function (data) {
-    logInfo("POST /task answer", data);
-    if (!data || !data.task_id) {
-      throw new Error("Pangram did not return a task id.");
+// -1, 0, or 1 as version a ([4, 1]) is lower than, equal to, or higher than
+// version b. A missing part counts as 0, so 4 equals 4.0.
+function compareVersions(a, b) {
+  for (var i = 0; i < Math.max(a.length, b.length); i++) {
+    var diff = (a[i] || 0) - (b[i] || 0);
+    if (diff) {
+      return diff < 0 ? -1 : 1;
     }
-    return { taskId: data.task_id };
+  }
+  return 0;
+}
+
+// The "pangram-<number>" selector with the highest number, or "" if no
+// selector has that form. The number may have dot parts: 4.1 is higher than
+// 4, and 4.10 is higher than 4.9. Of two equal numbers, the first one listed
+// wins.
+function newestModel(models) {
+  var newest = "";
+  var newestVersion = null;
+  models.forEach(function (name) {
+    var match = NUMBERED_MODEL.exec(name);
+    if (!match) {
+      return;
+    }
+    var version = match[1].split(".").map(Number);
+    if (!newestVersion || compareVersions(version, newestVersion) > 0) {
+      newest = name;
+      newestVersion = version;
+    }
+  });
+  return newest;
+}
+
+// The model a check sends: the one picked on the options page, else the
+// newest numbered model the key can use now, else "default".
+function chooseModel() {
+  return chrome.storage.sync.get(MODEL_SETTING).then(function (items) {
+    var picked = items[MODEL_SETTING];
+    if (typeof picked === "string" && picked) {
+      return picked;
+    }
+    return listModels().then(function (models) {
+      return newestModel(models) || FALLBACK_MODEL;
+    });
+  });
+}
+
+// { taskId, model }: the model goes back to the content script, which saves
+// it with the result.
+function createTask(text) {
+  return chooseModel().then(function (model) {
+    return callApi("/task", {
+      method: "POST",
+      body: JSON.stringify({ text: text, model: model, public_dashboard_link: false })
+    }).then(function (data) {
+      if (!data || !data.task_id) {
+        throw new Error("Pangram did not return a task id.");
+      }
+      return { taskId: data.task_id, model: model };
+    });
   });
 }
 
 function getTask(taskId) {
   return callApi("/task/" + encodeURIComponent(taskId), { method: "GET" }).then(function (data) {
-    var stage = data && data.stage;
-    if (stage === "STAGE_SUCCESS" || stage === "STAGE_FAILED") {
-      logResult(taskId, data);
-    } else {
-      logInfo("task " + taskId + " stage", stage);
-    }
     return { result: data };
   });
 }
@@ -218,6 +231,11 @@ function handle(message) {
         return Promise.reject(new Error("Missing result to save."));
       }
       return saveResult(message.hash, message.saved);
+    case "pangram-models":
+      // For the options page's model menu.
+      return listModels().then(function (models) {
+        return { models: models, newest: newestModel(models) };
+      });
     case "open-options":
       return chrome.runtime.openOptionsPage().then(function () {
         return {};
