@@ -269,8 +269,11 @@ is stored only in this browser. Each check uses Pangram API credits.
   After you click **Send to Pangram**, the redacted text goes to the
   background service worker (`src/background/service-worker.js`), which calls
   `POST https://text.external-api.pangram.com/task` with the saved key and
-  then `GET /task/:id` once per content-script message until the task
-  finishes. The key stays in `chrome.storage.local`, which the worker limits
+  the `pangram-4` model, then `GET /task/:id` once per content-script message
+  until the task finishes. Each check also writes diagnostic lines to the
+  worker's console (`GET /models`, the text sent, and Pangram's full answer);
+  open them with **service worker** on the extension card at
+  `chrome://extensions`. The key stays in `chrome.storage.local`, which the worker limits
   to extension pages; the options page (`src/options/`) saves or removes it.
   The **Send without preview** setting is one flag in `chrome.storage.sync`.
   Each finished check is saved in `chrome.storage.local` through the worker
