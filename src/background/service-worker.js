@@ -24,6 +24,7 @@
 "use strict";
 
 var API_BASE = "https://text.external-api.pangram.com";
+var MODEL = "pangram-4"; // a selector from GET /models; "default" may differ from the dashboard
 var KEY_NAME = "pangramApiKey";
 var RESULT_PREFIX = "pangramResult:"; // the options page deletes these too
 var TEXT_HASH = /^[0-9a-f]{64}$/;
@@ -90,11 +91,60 @@ function callApi(path, init) {
   });
 }
 
+// Diagnostic log lines go to this worker's console: on chrome://extensions,
+// click "service worker" on the extension card. They hold the redacted text
+// Pangram scored, which stays in this browser.
+function logInfo(label, value) {
+  console.info("[BetterCanvas] Pangram " + label, value);
+}
+
+// The model selectors this key may use, logged with each check (the console
+// keeps nothing from before it opens), to compare with the model version in
+// each result.
+function logModels() {
+  callApi("/models", { method: "GET" }).then(
+    function (data) {
+      logInfo("GET /models", data);
+    },
+    function (err) {
+      console.warn("[BetterCanvas] Pangram GET /models failed", err);
+    }
+  );
+}
+
+// A finished task: a one-line summary, one table row per scored window, and
+// the full answer.
+function logResult(taskId, data) {
+  logInfo("task " + taskId + " " + data.stage, {
+    version: data.version,
+    headline: data.headline,
+    prediction_short: data.prediction_short,
+    fraction_ai: data.fraction_ai,
+    fraction_ai_assisted: data.fraction_ai_assisted,
+    fraction_human: data.fraction_human
+  });
+  console.table((data.windows || []).map(function (win) {
+    return {
+      label: win.label,
+      ai_assistance_score: win.ai_assistance_score,
+      confidence: win.confidence,
+      is_humanized: win.is_humanized,
+      humanizer_score: win.humanizer_score,
+      word_count: win.word_count
+    };
+  }));
+  logInfo("task " + taskId + " full answer", data);
+}
+
 function createTask(text) {
+  var body = { text: text, model: MODEL, public_dashboard_link: false };
+  logModels();
+  logInfo("POST /task", { model: body.model, characters: text.length, text: text });
   return callApi("/task", {
     method: "POST",
-    body: JSON.stringify({ text: text, model: "default", public_dashboard_link: false })
+    body: JSON.stringify(body)
   }).then(function (data) {
+    logInfo("POST /task answer", data);
     if (!data || !data.task_id) {
       throw new Error("Pangram did not return a task id.");
     }
@@ -104,6 +154,12 @@ function createTask(text) {
 
 function getTask(taskId) {
   return callApi("/task/" + encodeURIComponent(taskId), { method: "GET" }).then(function (data) {
+    var stage = data && data.stage;
+    if (stage === "STAGE_SUCCESS" || stage === "STAGE_FAILED") {
+      logResult(taskId, data);
+    } else {
+      logInfo("task " + taskId + " stage", stage);
+    }
     return { result: data };
   });
 }
