@@ -22,7 +22,8 @@ label {
   font-weight: 600;
   margin-bottom: 4px;
 }
-input {
+input,
+select {
   box-sizing: border-box;
   width: 100%;
   font: inherit;
@@ -50,6 +51,7 @@ button[type="submit"] {
   background: #2b5586;
 }
 #status,
+#model-status,
 #results-status {
   margin-top: 12px;
   color: #3d4657;

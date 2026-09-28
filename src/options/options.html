@@ -20,6 +20,15 @@
     </div>
   </form>
   <p id="status" role="status"></p>
+  <h2>Pangram model</h2>
+  <p>
+    Each check uses this model. <strong>Newest</strong> asks Pangram at each
+    check which models your key can use, and picks the
+    <code>pangram-</code> model with the highest number.
+  </p>
+  <label for="model">Model</label>
+  <select id="model"></select>
+  <p id="model-status" role="status"></p>
   <h2>Saved Pangram results</h2>
   <p>
     Each Pangram result is saved in this browser. When you prepare a

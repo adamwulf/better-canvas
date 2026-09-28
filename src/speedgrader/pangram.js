@@ -52,7 +52,9 @@
 // text for "Prepare text for Pangram" during that visit. "Check again" (or
 // "Send to Pangram again") always sends a new check, and its result replaces
 // the saved one. A saved result holds Pangram's answer (with the redacted
-// text Pangram scored), the facts shown with it, and the time of the check.
+// text Pangram scored and the model version), the facts shown with it, the
+// model selector the check sent, and the time of the check. Results saved
+// before the selector was kept show only the version.
 
 (function () {
   "use strict";
@@ -132,6 +134,19 @@
 
   function checkedText(time) {
     return "Checked " + new Date(time).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  }
+
+  // The model selector the check sent, and the version Pangram reports in
+  // its result.
+  function modelText(model, result) {
+    var version = result && result.version ? String(result.version) : "";
+    if (model && version) {
+      return "Model: " + model + " (version " + version + ")";
+    }
+    if (model) {
+      return "Model: " + model;
+    }
+    return version ? "Model version: " + version : "Model: unknown";
   }
 
   function delay(ms) {
@@ -378,6 +393,7 @@
       hash: state.hash,
       saved: {
         checkedAt: state.checkedAt,
+        model: state.model,
         result: state.result,
         preview: {
           names: preview.names,
@@ -459,6 +475,7 @@
       attempt: read.submission.attempt,
       hash: read.hash,
       result: saved.result,
+      model: typeof saved.model === "string" ? saved.model : "",
       preview: saved.preview,
       checkedAt: saved.checkedAt
     });
@@ -519,7 +536,7 @@
   function prepare(target, thenSend, recheck) {
     var state = stateFor(target.key);
     var alreadyRead = recheck ? null : state.read;
-    update(state, { status: "preparing", error: "", needsKey: false, result: null, preview: null, hash: "", checkedAt: 0, read: null });
+    update(state, { status: "preparing", error: "", needsKey: false, result: null, model: "", preview: null, hash: "", checkedAt: 0, read: null });
     var hasKey, read;
 
     // The key check runs first: it also starts the background worker, which
@@ -587,7 +604,8 @@
     update(state, { status: "checking", stage: "" });
     var started = Date.now();
 
-    function poll(taskId) {
+    // model: the selector the background worker sent with the text.
+    function poll(taskId, model) {
       return delay(POLL_MS)
         .then(function () {
           return sendMessage({ type: "pangram-get-task", taskId: taskId });
@@ -595,7 +613,7 @@
         .then(function (value) {
           var result = value.result || {};
           if (result.stage === "STAGE_SUCCESS") {
-            update(state, { status: "done", result: result, checkedAt: Date.now() });
+            update(state, { status: "done", result: result, model: model, checkedAt: Date.now() });
             saveResult(state);
             return null;
           }
@@ -606,14 +624,14 @@
             throw new Error("Pangram did not finish within 5 minutes. Try again later.");
           }
           update(state, { stage: result.stage || "" });
-          return poll(taskId);
+          return poll(taskId, model);
         });
     }
 
     // The editor's current text, as the grader left it.
     sendMessage({ type: "pangram-create-task", text: state.preview.text })
       .then(function (value) {
-        return poll(value.taskId);
+        return poll(value.taskId, value.model);
       })
       .catch(function (err) {
         update(state, { status: "error", error: errorText(err), needsKey: false });
@@ -767,7 +785,10 @@
       section.appendChild(el("h3", "bc-pg-section-title",
         "Pangram: " + (result.prediction_short || result.headline || "Result")));
       section.appendChild(scoreLines(result, top));
-      section.appendChild(el("div", "bc-pg-checked", checkedText(state.checkedAt)));
+      var checked = el("div", "bc-pg-checked");
+      checked.appendChild(el("div", "", checkedText(state.checkedAt)));
+      checked.appendChild(el("div", "", modelText(state.model, result)));
+      section.appendChild(checked);
       var notes = sentNotes(state.preview);
       if (notes) {
         section.appendChild(notes);
@@ -984,6 +1005,7 @@
       body.appendChild(head);
       body.appendChild(fractionBar(result));
       var list = facts(state.preview);
+      list.insertBefore(el("li", "", modelText(state.model, result)), list.firstChild);
       list.insertBefore(el("li", "", checkedText(state.checkedAt)), list.firstChild);
       body.appendChild(list);
       body.appendChild(resultText(result));
