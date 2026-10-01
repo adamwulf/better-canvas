@@ -1,14 +1,17 @@
 // Better Canvas (Rice) — Pangram AI-detection check in SpeedGrader
 //
 // Adds a "Pangram" section to the SpeedGrader grading panel, under the
-// submission details. The section shows two steps for the student on screen:
-// "Prepare text for Pangram" and "Send to Pangram". Preparing runs these
-// steps:
+// submission details. The section shows two steps for the submission on
+// screen: "Prepare text for Pangram" and "Send to Pangram". Preparing runs
+// these steps:
 //
 //   1. Ask the background worker whether a Pangram API key is saved.
-//   2. Load the submission (GET /api/v1/courses/:id/assignments/:id/
-//      submissions/:user_id).
-//   3. Turn the submission into plain text in the browser: the text-entry
+//   2. Load the submission with all its attempts (GET /api/v1/courses/:id/
+//      assignments/:id/submissions/:user_id?include[]=submission_history),
+//      and take the attempt on screen: the one the URL's attempt parameter
+//      names (SpeedGrader adds it when the grader picks an earlier
+//      submission in "Submission to view"), else the latest.
+//   3. Turn that attempt into plain text in the browser: the text-entry
 //      body, or each PDF, Word (.docx), or .txt file
 //      (BetterCanvasSubmissionText), joined into one text. If a result is
 //      saved for that text, show it and stop here (see below); showing it
@@ -35,20 +38,22 @@
 // Pangram again" and does the same. That one setting is saved in
 // chrome.storage.sync.
 //
-// SpeedGrader is a React app that switches students without a page load and
-// re-renders the grading panel, so a MutationObserver and the Navigation
-// API's currententrychange event keep the section in place and in step with
-// the student in the URL. Each section button checks the URL again before it
+// SpeedGrader is a React app that switches students and attempts without a
+// page load and re-renders the grading panel, so a MutationObserver and the
+// Navigation API's currententrychange event keep the section in place and in
+// step with the student and attempt in the URL. Each attempt has its own
+// section state, and each section button checks the URL again before it
 // acts.
 //
 // Each result is saved in chrome.storage.local, through the background worker
 // (which keeps that area from content scripts), under the SHA-256 hash of the
-// text from step 3: the submission's joined text before redaction and before
-// any edit in the dialog. Preparing a text with a saved result shows that
-// result and sends nothing. Each time a student comes up with an idle
-// section and any result is saved, steps 1-3 run by themselves to look for
-// that student's saved result, so a submission already checked shows its
-// result with no click; with none, the section stays at step 1 and keeps the
+// text from step 3: the attempt's joined text before redaction and before
+// any edit in the dialog, so each attempt finds the result for its own text.
+// Preparing a text with a saved result shows that result and sends nothing.
+// Each time a student or attempt comes up with an idle section and any
+// result is saved, steps 1-3 run by themselves to look for that attempt's
+// saved result, so a submission already checked shows its result with no
+// click; with none, the section stays at step 1 and keeps the
 // text for "Prepare text for Pangram" during that visit. "Check again" (or
 // "Send to Pangram again") always sends a new check, and its result replaces
 // the saved one. A saved result holds Pangram's answer (with the redacted
@@ -79,6 +84,7 @@
   var ROSTER_STATES = ["active", "invited", "completed", "inactive"];
   var CANVAS_ID = /^\d+(?:~\d+)?$/;
   var ANONYMOUS_ID = /^[A-Za-z0-9]+$/;
+  var ATTEMPT = /^[1-9]\d*$/;
   var SEND_WITHOUT_PREVIEW = "pangramSendWithoutPreview"; // chrome.storage.sync key
   var CATEGORIES = [
     { key: "ai", label: "AI", field: "fraction_ai" },
@@ -90,7 +96,7 @@
   var rosterReady = null; // Promise<{ names, ids }>, loaded once per page
   var dialog = null; // { key, root, body, footer }
   var sendWithoutPreview = false;
-  var shownKey = ""; // the student last on screen
+  var shownKey = ""; // the student and attempt last on screen
 
   // ---- Small helpers --------------------------------------------------------
 
@@ -265,14 +271,31 @@
     return rosterReady;
   }
 
+  // The submission, with each of its attempts in submission_history.
   function loadSubmission(target) {
     var base = "/api/v1/courses/" + courseId + "/assignments/" + target.assignmentId;
     var url = target.studentId
-      ? base + "/submissions/" + target.studentId + "?include[]=user"
-      : base + "/anonymous_submissions/" + target.anonymousId;
+      ? base + "/submissions/" + target.studentId + "?include[]=user&include[]=submission_history"
+      : base + "/anonymous_submissions/" + target.anonymousId + "?include[]=submission_history";
     return canvasFetch(url).then(function (res) {
       return res.json();
     });
+  }
+
+  // The attempt on screen: the one the URL names, else the latest (the
+  // submission itself). Each submission_history entry is one attempt, with
+  // its own type, text, and files.
+  function shownAttempt(submission, attempt) {
+    if (!attempt) {
+      return submission;
+    }
+    var found = (submission.submission_history || []).filter(function (entry) {
+      return String(entry.attempt) === attempt;
+    })[0];
+    if (!found) {
+      throw new Error("Canvas did not return attempt " + attempt + " of this submission.");
+    }
+    return found;
   }
 
   // Attachment URLs are Canvas download links on this same site; Canvas may
@@ -412,19 +435,38 @@
 
   // ---- Check flow -----------------------------------------------------------
 
+  // The student and attempt on screen. SpeedGrader adds attempt=N to the URL
+  // when the grader picks an earlier submission in "Submission to view";
+  // without it, the latest attempt is on screen. The key names the attempt
+  // only when the URL does, so each attempt has its own check state.
   function currentTarget() {
     var params = new URLSearchParams(location.search);
     var assignmentId = params.get("assignment_id") || "";
     var studentId = params.get("student_id") || "";
     var anonymousId = params.get("anonymous_id") || "";
+    var attempt = params.get("attempt") || "";
     if (!CANVAS_ID.test(assignmentId)) {
       return null;
     }
+    if (!ATTEMPT.test(attempt)) {
+      attempt = "";
+    }
+    var attemptKey = attempt ? ":attempt:" + attempt : "";
     if (CANVAS_ID.test(studentId)) {
-      return { assignmentId: assignmentId, studentId: studentId, key: assignmentId + ":" + studentId };
+      return {
+        assignmentId: assignmentId,
+        studentId: studentId,
+        attempt: attempt,
+        key: assignmentId + ":" + studentId + attemptKey
+      };
     }
     if (ANONYMOUS_ID.test(anonymousId)) {
-      return { assignmentId: assignmentId, anonymousId: anonymousId, key: assignmentId + ":anon:" + anonymousId };
+      return {
+        assignmentId: assignmentId,
+        anonymousId: anonymousId,
+        attempt: attempt,
+        key: assignmentId + ":anon:" + anonymousId + attemptKey
+      };
     }
     return null;
   }
@@ -445,15 +487,17 @@
     renderDialog();
   }
 
-  // { submission, extracted, hash }: the student's submission, its text, and
-  // that text's hash. The caller messages the background worker first, which
-  // starts it, so it locks the key away from content scripts before any
-  // student file is parsed here.
+  // { submission, user, extracted, hash }: the attempt on screen, the student
+  // (when Canvas includes them), the attempt's text, and that text's hash.
+  // The caller messages the background worker first, which starts it, so it
+  // locks the key away from content scripts before any student file is
+  // parsed here.
   function readSubmission(target) {
-    var submission, extracted;
+    var submission, user, extracted;
     return loadSubmission(target)
       .then(function (loaded) {
-        submission = loaded;
+        user = loaded.user;
+        submission = shownAttempt(loaded, target.attempt);
         return submissionText(submission);
       })
       .then(function (found) {
@@ -465,7 +509,7 @@
         return textHash(found.text);
       })
       .then(function (hash) {
-        return { submission: submission, extracted: extracted, hash: hash };
+        return { submission: submission, user: user, extracted: extracted, hash: hash };
       });
   }
 
@@ -481,12 +525,12 @@
     });
   }
 
-  // Looks for a saved result each time a student comes up with an idle
-  // section, so a submission already checked shows its result with no click.
-  // It reads the text but needs no key or roster, and nothing leaves the
-  // browser. It runs only when some result is saved, and only if the student
-  // is still on screen, so paging through students does not read every
-  // submission. With no saved result, the section goes back to step 1 and
+  // Looks for a saved result each time a student or attempt comes up with an
+  // idle section, so a submission already checked shows its result with no
+  // click. It reads the text but needs no key or roster, and nothing leaves
+  // the browser. It runs only when some result is saved, and only if the
+  // attempt is still on screen, so paging through students does not read
+  // every submission. With no saved result, the section goes back to step 1 and
   // keeps the text it read for "Prepare text for Pangram" during this visit;
   // Prepare also shows any error.
   function lookup(target) {
@@ -501,7 +545,7 @@
         }
         var current = currentTarget();
         if (!current || current.key !== target.key) {
-          return null; // renderSection() looks again when the student is back
+          return null; // renderSection() looks again when the attempt is back
         }
         if (!status.hasResults) {
           return null;
@@ -567,8 +611,8 @@
         return loadRoster().then(function (roster) {
           var submission = read.submission;
           var extracted = read.extracted;
-          var names = roster.names.concat(userNames(submission.user));
-          var ids = roster.ids.concat(userIds(submission.user));
+          var names = roster.names.concat(userNames(read.user));
+          var ids = roster.ids.concat(userIds(read.user));
           var redactor = Redact.createRedactor(names, ids);
           var redacted = redactor.redact(extracted.text);
           update(state, {
@@ -705,8 +749,9 @@
     return stage ? " (" + stage.replace(/^STAGE_/, "").toLowerCase().replace(/_/g, " ") + ")" : "";
   }
 
-  // A section button acts only if its student is still the one in the URL;
-  // otherwise the section is out of date, so it is redrawn instead.
+  // A section button acts only if its student and attempt are still the ones
+  // in the URL; otherwise the section is out of date, so it is redrawn
+  // instead.
   function forStudent(key, action) {
     return function () {
       var target = currentTarget();
@@ -830,8 +875,10 @@
 
   function renderSection() {
     var target = currentTarget();
-    // Each time a student comes up, an idle section looks for a saved result
-    // again, so it reads the latest attempt, not text from an earlier visit.
+    // Each time a student or attempt comes up, an idle section looks for a
+    // saved result again, so it reads the submission as it is now (with no
+    // attempt in the URL, a new latest attempt), not text from an earlier
+    // visit.
     if (target && target.key !== shownKey) {
       shownKey = target.key;
       var arrived = stateFor(target.key);
@@ -865,7 +912,7 @@
       fillSection(section, target, state);
     }
     if (dialog && dialog.key !== target.key) {
-      closeDialog(); // the grader moved to another student
+      closeDialog(); // the grader moved to another student or attempt
     }
   }
 
