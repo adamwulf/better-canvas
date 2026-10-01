@@ -487,10 +487,11 @@
   // attempt (see currentTarget()), and no URL reaches the state under the
   // key that names it, so that state is merged here, once. It moves to the
   // key with no attempt as the same object, so a check running on it goes on
-  // and shows under both URL forms. It is dropped instead when it is idle
-  // and that key already has a state, or when that key holds work
-  // (preparing, ready, checking, or done), such as the grader's own Prepare,
-  // whose read records the number.
+  // and shows under both URL forms. It is dropped instead when that key
+  // already has a state and this one is idle or failed (it failed before its
+  // read loaded, as that read would have merged it, so it holds no text), or
+  // when that key holds work (preparing, ready, checking, or done), such as
+  // the grader's own Prepare, whose read records the number.
   function recordLatest(studentKey, attempt) {
     latestAttempts[studentKey] = attempt;
     var named = studentKey + ":attempt:" + attempt;
@@ -500,7 +501,8 @@
       return;
     }
     delete checks[named];
-    if (there && (moving.status === "idle" || ["preparing", "ready", "checking", "done"].indexOf(there.status) !== -1)) {
+    if (there && (moving.status === "idle" || moving.status === "error" ||
+        ["preparing", "ready", "checking", "done"].indexOf(there.status) !== -1)) {
       return;
     }
     moving.key = studentKey;
