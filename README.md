@@ -94,7 +94,8 @@ photo and any failed downloads are reported after the remaining photos finish.
 ### 7. Pangram AI check in SpeedGrader
 
 In SpeedGrader, a **Pangram** box appears in the grading panel under the
-submission details. It checks the student on screen with
+submission details. It checks the submission on screen (the one picked in
+**Submission to view** when a student has more than one, else the latest) with
 [Pangram](https://www.pangram.com)'s AI-detection API in two steps:
 **1. Prepare text for Pangram** and **2. Send to Pangram**.
 
@@ -157,8 +158,10 @@ saved result…** while it reads the text in the browser) and shows it at once.
 The lookup sends nothing and needs no API key. With no saved result, the box
 stays at step 1, and **Prepare text for Pangram** uses the text already read.
 **Check again** (or **Send to Pangram again**) in **Details** always makes a
-new check, and its result replaces the saved one. The check always reads the
-student's latest attempt, so a new attempt with new text gets a new check.
+new check, and its result replaces the saved one. The box follows
+**Submission to view**: each submission of a student has its own box, which
+reads, checks, and shows the result for that submission's own text, so a new
+submission with new text gets a new check.
 **Delete saved results** on the options page removes them all.
 
 Each result, new or saved, shows the model that scored it: the model name
@@ -255,14 +258,18 @@ synced extension storage.
   submission-details block of the React SpeedGrader grading panel (the file
   list, else the word count, else the "Submitted:" line). A
   `MutationObserver` and the Navigation API's `currententrychange` event keep
-  it there and in step with the `student_id` in the URL as SpeedGrader
-  switches students, and each of its buttons reads the URL again before it
-  acts, so it never checks a student who is no longer on screen. The submission is shown in Canvas
+  it there and in step with the `student_id` and `attempt` in the URL as
+  SpeedGrader switches students and submissions, and each of its buttons
+  reads the URL again before it acts, so it never checks a submission that is
+  no longer on screen. The submission is shown in Canvas
   DocViewer, a cross-origin iframe that draws each page, so the script does
   not read the page. It asks Canvas for the submission instead
-  (`GET /api/v1/courses/:id/assignments/:id/submissions/:user_id?include[]=user`,
-  or `…/anonymous_submissions/:anonymous_id` for anonymous grading) and
-  downloads each attachment from its Canvas URL. `src/speedgrader/submission-text.js`
+  (`GET /api/v1/courses/:id/assignments/:id/submissions/:user_id?include[]=user&include[]=submission_history`,
+  or `…/anonymous_submissions/:anonymous_id?include[]=submission_history`
+  for anonymous grading), takes the attempt the URL names (SpeedGrader adds
+  `attempt=N` when you pick an earlier submission in **Submission to view**)
+  from `submission_history`, else the latest, and downloads each of that
+  attempt's attachments from its Canvas URL. `src/speedgrader/submission-text.js`
   turns that into plain text: DOMParser for the text-entry HTML; for `.docx`,
   a small ZIP reader plus the browser's `DecompressionStream` to get
   `word/document.xml`, then a walk of its `w:t` runs (skipping deleted text,
