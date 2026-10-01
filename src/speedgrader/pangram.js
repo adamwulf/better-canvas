@@ -484,20 +484,25 @@
 
   // Records the student's latest attempt number, which every read gets from
   // Canvas. From then on attempt=N with that number has the same key as no
-  // attempt (see currentTarget()), so a state already under the key that
-  // names it moves to that key: the same object, so a check running on it
-  // goes on and shows under both URL forms. A state the grader is working on
-  // under the key with no attempt stays, but it cannot be there in normal
-  // use: a read under that key would have recorded the number first.
+  // attempt (see currentTarget()), and no URL reaches the state under the
+  // key that names it, so that state is merged here, once. It moves to the
+  // key with no attempt as the same object, so a check running on it goes on
+  // and shows under both URL forms. It is dropped instead when it is idle
+  // and that key already has a state, or when that key holds work
+  // (preparing, ready, checking, or done), such as the grader's own Prepare,
+  // whose read records the number.
   function recordLatest(studentKey, attempt) {
     latestAttempts[studentKey] = attempt;
     var named = studentKey + ":attempt:" + attempt;
     var moving = checks[named];
     var there = checks[studentKey];
-    if (!moving || (there && ["preparing", "ready", "checking", "done"].indexOf(there.status) !== -1)) {
+    if (!moving) {
       return;
     }
     delete checks[named];
+    if (there && (moving.status === "idle" || ["preparing", "ready", "checking", "done"].indexOf(there.status) !== -1)) {
+      return;
+    }
     moving.key = studentKey;
     checks[studentKey] = moving;
     if (dialog && dialog.key === named) {
