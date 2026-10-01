@@ -93,7 +93,8 @@
   ];
 
   var checks = Object.create(null); // submission key -> check state
-  var latestAttempts = Object.create(null); // student key -> latest attempt number, from the last read of the latest
+  var latestAttempts = Object.create(null); // student key -> latest attempt number, from the last read
+  var versions = 0; // the last state version given out; no two states share one
   var rosterReady = null; // Promise<{ names, ids }>, loaded once per page
   var dialog = null; // { key, root, body, footer }
   var sendWithoutPreview = false;
@@ -440,8 +441,8 @@
   // when the grader picks a submission in "Submission to view"; without it,
   // the latest attempt is on screen. Each attempt has its own check state,
   // under a key that names the attempt. The latest attempt has one key, with
-  // or without attempt=N in the URL, once a read with no attempt in the URL
-  // has found its number.
+  // or without attempt=N in the URL, once a read has found its number (see
+  // recordLatest()).
   function currentTarget() {
     var params = new URLSearchParams(location.search);
     var assignmentId = params.get("assignment_id") || "";
@@ -467,7 +468,7 @@
 
   function stateFor(key) {
     if (!checks[key]) {
-      checks[key] = { key: key, status: "idle", version: 0 };
+      checks[key] = { key: key, status: "idle", version: ++versions };
     }
     return checks[key];
   }
@@ -476,9 +477,35 @@
     Object.keys(changes).forEach(function (name) {
       state[name] = changes[name];
     });
-    state.version++;
+    state.version = ++versions;
     renderSection();
     renderDialog();
+  }
+
+  // Records the student's latest attempt number, which every read gets from
+  // Canvas. From then on attempt=N with that number has the same key as no
+  // attempt (see currentTarget()), so a state already under the key that
+  // names it moves to that key: the same object, so a check running on it
+  // goes on and shows under both URL forms. A state the grader is working on
+  // under the key with no attempt stays, but it cannot be there in normal
+  // use: a read under that key would have recorded the number first.
+  function recordLatest(studentKey, attempt) {
+    latestAttempts[studentKey] = attempt;
+    var named = studentKey + ":attempt:" + attempt;
+    var moving = checks[named];
+    var there = checks[studentKey];
+    if (!moving || (there && ["preparing", "ready", "checking", "done"].indexOf(there.status) !== -1)) {
+      return;
+    }
+    delete checks[named];
+    moving.key = studentKey;
+    checks[studentKey] = moving;
+    if (dialog && dialog.key === named) {
+      dialog.key = studentKey;
+    }
+    if (shownKey === named) {
+      shownKey = studentKey;
+    }
   }
 
   // { submission, user, extracted, hash }: the attempt on screen, the student
@@ -490,11 +517,10 @@
     var submission, user, extracted;
     return loadSubmission(target)
       .then(function (loaded) {
-        // Only a read of the latest records its number, so a state under a
-        // key that names the attempt is not moved to the latest one's key
-        // while it is in use.
-        if (!target.attempt && loaded.attempt) {
-          latestAttempts[target.studentKey] = String(loaded.attempt);
+        // The submission itself is always the latest attempt, whichever
+        // attempt is on screen.
+        if (loaded.attempt) {
+          recordLatest(target.studentKey, String(loaded.attempt));
         }
         user = loaded.user;
         submission = shownAttempt(loaded, target.attempt);
