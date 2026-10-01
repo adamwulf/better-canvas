@@ -93,6 +93,7 @@
   ];
 
   var checks = Object.create(null); // submission key -> check state
+  var latestAttempts = Object.create(null); // student key -> latest attempt number, from the last read of the latest
   var rosterReady = null; // Promise<{ names, ids }>, loaded once per page
   var dialog = null; // { key, root, body, footer }
   var sendWithoutPreview = false;
@@ -436,39 +437,32 @@
   // ---- Check flow -----------------------------------------------------------
 
   // The student and attempt on screen. SpeedGrader adds attempt=N to the URL
-  // when the grader picks an earlier submission in "Submission to view";
-  // without it, the latest attempt is on screen. The key names the attempt
-  // only when the URL does, so each attempt has its own check state.
+  // when the grader picks a submission in "Submission to view"; without it,
+  // the latest attempt is on screen. Each attempt has its own check state,
+  // under a key that names the attempt. The latest attempt has one key, with
+  // or without attempt=N in the URL, once a read with no attempt in the URL
+  // has found its number.
   function currentTarget() {
     var params = new URLSearchParams(location.search);
     var assignmentId = params.get("assignment_id") || "";
     var studentId = params.get("student_id") || "";
     var anonymousId = params.get("anonymous_id") || "";
     var attempt = params.get("attempt") || "";
+    var target;
     if (!CANVAS_ID.test(assignmentId)) {
       return null;
     }
-    if (!ATTEMPT.test(attempt)) {
-      attempt = "";
-    }
-    var attemptKey = attempt ? ":attempt:" + attempt : "";
     if (CANVAS_ID.test(studentId)) {
-      return {
-        assignmentId: assignmentId,
-        studentId: studentId,
-        attempt: attempt,
-        key: assignmentId + ":" + studentId + attemptKey
-      };
+      target = { assignmentId: assignmentId, studentId: studentId, studentKey: assignmentId + ":" + studentId };
+    } else if (ANONYMOUS_ID.test(anonymousId)) {
+      target = { assignmentId: assignmentId, anonymousId: anonymousId, studentKey: assignmentId + ":anon:" + anonymousId };
+    } else {
+      return null;
     }
-    if (ANONYMOUS_ID.test(anonymousId)) {
-      return {
-        assignmentId: assignmentId,
-        anonymousId: anonymousId,
-        attempt: attempt,
-        key: assignmentId + ":anon:" + anonymousId + attemptKey
-      };
-    }
-    return null;
+    target.attempt = ATTEMPT.test(attempt) ? attempt : "";
+    var named = target.attempt && target.attempt !== latestAttempts[target.studentKey];
+    target.key = target.studentKey + (named ? ":attempt:" + target.attempt : "");
+    return target;
   }
 
   function stateFor(key) {
@@ -496,6 +490,12 @@
     var submission, user, extracted;
     return loadSubmission(target)
       .then(function (loaded) {
+        // Only a read of the latest records its number, so a state under a
+        // key that names the attempt is not moved to the latest one's key
+        // while it is in use.
+        if (!target.attempt && loaded.attempt) {
+          latestAttempts[target.studentKey] = String(loaded.attempt);
+        }
         user = loaded.user;
         submission = shownAttempt(loaded, target.attempt);
         return submissionText(submission);
