@@ -324,8 +324,9 @@ Canvas does not share the student's email address with you.
   enrollment is inactive, whom SpeedGrader can also show. The link goes
   first in the grading panel's flex column (the first child of
   `[data-testid="speedgrader-grading-panel"]`), as one more item, so the
-  column keeps its height; `src/speedgrader/email-student.css` spaces it
-  from the panel's edge. A `MutationObserver` and the
+  column keeps its height; `src/speedgrader/email-student.css` lines it up
+  with the panel's rows and gives it the theme's link color
+  (`--ic-link-color`). A `MutationObserver` and the
   Navigation API's `currententrychange` event keep the link there and in
   step with the student in the URL. With an `anonymous_id` in the URL and no
   `student_id`, there is no link.
@@ -382,7 +383,7 @@ src/
   speedgrader/pangram.css       section + dialog styling
   speedgrader/submission-text.js  text from text entries, PDF, DOCX, TXT
   speedgrader/email-student.js  SpeedGrader "Email this student" link
-  speedgrader/email-student.css  link spacing
+  speedgrader/email-student.css  link spacing + color
   background/service-worker.js  holds the API key, calls the Pangram API
   options/                      options page for the Pangram API key and model
 tests/
