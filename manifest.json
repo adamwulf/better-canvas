@@ -77,7 +77,8 @@
       "js": [
         "src/lib/redact.js",
         "src/speedgrader/submission-text.js",
-        "src/speedgrader/pangram.js"
+        "src/speedgrader/pangram.js",
+        "src/speedgrader/email-student.js"
       ],
       "css": ["src/speedgrader/pangram.css"],
       "run_at": "document_idle",
