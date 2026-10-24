@@ -182,11 +182,11 @@ synced extension storage.
 
 ### 8. Email this student in SpeedGrader
 
-In SpeedGrader, an **Email this student** link appears under the
-**Submitted:** row of the grading panel (under **Submission to view:** when a
-student has more than one submission). It is a `mailto:` link to the
-student's primary email address in Canvas, so it opens your mail app with
-the address filled in. The link does not show for anonymous grading, or when
+In SpeedGrader, an **Email this student** link appears at the top of the
+grading panel for every student, including a student who has not submitted
+anything. It is a `mailto:` link to the student's primary email address in
+Canvas, so it opens your mail app (or your web mail, in a new tab) with the
+address filled in. The link does not show for anonymous grading, or when
 Canvas does not share the student's email address with you.
 
 ## How it works
@@ -321,11 +321,11 @@ Canvas does not share the student's email address with you.
   page (`GET /api/v1/courses/:id/users/:user_id?include[]=email&include[]=inactive_enrollments`).
   Canvas includes `email` only when you may read email addresses in the
   course; `inactive_enrollments` lets Canvas find a student whose
-  enrollment is inactive, whom SpeedGrader can also show. The link goes last inside the **Submitted:** section
-  (`#single-submission-info`), else inside the section that holds the
-  **Submission to view:** picker (`[data-testid="submission-history-select"]`).
-  It goes inside the section, not after it, so it never competes with the
-  Pangram box for the place after that section. A `MutationObserver` and the
+  enrollment is inactive, whom SpeedGrader can also show. The link goes
+  first in the grading panel's flex column (the first child of
+  `[data-testid="speedgrader-grading-panel"]`), as one more item, so the
+  column keeps its height; `src/speedgrader/email-student.css` spaces it
+  from the panel's edge. A `MutationObserver` and the
   Navigation API's `currententrychange` event keep the link there and in
   step with the student in the URL. With an `anonymous_id` in the URL and no
   `student_id`, there is no link.
@@ -382,6 +382,7 @@ src/
   speedgrader/pangram.css       section + dialog styling
   speedgrader/submission-text.js  text from text entries, PDF, DOCX, TXT
   speedgrader/email-student.js  SpeedGrader "Email this student" link
+  speedgrader/email-student.css  link spacing
   background/service-worker.js  holds the API key, calls the Pangram API
   options/                      options page for the Pangram API key and model
 tests/

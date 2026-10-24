@@ -1,9 +1,8 @@
 // Better Canvas (Rice) — "Email this student" link in SpeedGrader
 //
-// Adds an "Email this student" mailto: link under the "Submitted:" row of
-// the SpeedGrader grading panel. A student with more than one submission has
-// "Submission to view:" in place of that row, so the link goes under it
-// instead. The address is the student's primary email, from
+// Adds an "Email this student" mailto: link at the top of the SpeedGrader
+// grading panel, for every student, with or without a submission. The
+// address is the student's primary email, from
 // GET /api/v1/courses/:id/users/:user_id?include[]=email&include[]=
 // inactive_enrollments. Canvas fills in the email only when the grader may
 // read email addresses. Without inactive_enrollments, Canvas does not find a
@@ -29,7 +28,7 @@
   }
   var courseId = courseMatch[1];
 
-  var LINK_MARK = "data-bc-email-student";
+  var HOLDER_CLASS = "bc-email-student";
   var CANVAS_ID = /^\d+(?:~\d+)?$/;
 
   var emails = Object.create(null); // student id -> address ("" for none), or null while it loads
@@ -79,25 +78,18 @@
     return "mailto:" + encodeURIComponent(email).replace(/%40/g, "@");
   }
 
-  // The row the link goes under: "Submitted:" for a student with one
-  // submission, else the "Submission to view:" picker.
-  function findRow() {
-    var single = document.getElementById("single-submission-info");
-    if (single) {
-      return single;
-    }
-    var picker = document.querySelector('[data-testid="submission-history-select"]');
-    return picker && picker.closest("section");
+  // The grading panel's column of items, which every student has. The link
+  // goes first in it, as one more item, so the column keeps its height.
+  function findColumn() {
+    var panel = document.querySelector('[data-testid="speedgrader-grading-panel"]');
+    return panel && panel.firstElementChild;
   }
 
-  // The link goes last inside the row's own section, not after it: the
-  // Pangram section may go right after the "Submitted:" section, and two
-  // scripts that each put their element there would move each other forever.
   function render() {
     var studentId = new URLSearchParams(location.search).get("student_id") || "";
-    var row = findRow();
-    var holder = document.querySelector("[" + LINK_MARK + "]");
-    var email = row && CANVAS_ID.test(studentId) ? emailFor(studentId) : "";
+    var column = findColumn();
+    var holder = document.querySelector("." + HOLDER_CLASS);
+    var email = column && CANVAS_ID.test(studentId) ? emailFor(studentId) : "";
     if (!email) {
       if (holder) {
         holder.remove();
@@ -106,7 +98,7 @@
     }
     if (!holder) {
       holder = document.createElement("div");
-      holder.setAttribute(LINK_MARK, "");
+      holder.className = HOLDER_CLASS;
       // A new tab, so a web mail handler (Gmail, Outlook) does not replace
       // SpeedGrader and any unsaved comment in it.
       var link = document.createElement("a");
@@ -119,8 +111,8 @@
     if (holder.firstChild.getAttribute("href") !== href) {
       holder.firstChild.setAttribute("href", href);
     }
-    if (row.lastElementChild !== holder) {
-      row.appendChild(holder);
+    if (column.firstElementChild !== holder) {
+      column.prepend(holder);
     }
   }
 

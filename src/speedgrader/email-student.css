@@ -1,0 +1,13 @@
+/* Better Canvas (Rice) — "Email this student" link in SpeedGrader.
+ *
+ * The link sits first in the grading panel's flex column. It keeps its own
+ * height when the column is short, and has its own space from the panel's
+ * edge. The link itself uses Canvas's link style.
+ */
+
+.bc-email-student {
+  flex-shrink: 0;
+  padding: 12px 12px 0;
+  font-size: 14px;
+  line-height: 1.4;
+}
