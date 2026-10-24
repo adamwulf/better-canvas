@@ -320,7 +320,8 @@ Canvas does not share the student's email address with you.
   the `student_id` from the URL and asks Canvas for that student once per
   page (`GET /api/v1/courses/:id/users/:user_id?include[]=email&include[]=inactive_enrollments`).
   Canvas includes `email` only when you may read email addresses in the
-  course. The link goes last inside the **Submitted:** section
+  course; `inactive_enrollments` lets Canvas find a student whose
+  enrollment is inactive, whom SpeedGrader can also show. The link goes last inside the **Submitted:** section
   (`#single-submission-info`), else inside the section that holds the
   **Submission to view:** picker (`[data-testid="submission-history-select"]`).
   It goes inside the section, not after it, so it never competes with the

@@ -4,9 +4,13 @@
 // the SpeedGrader grading panel. A student with more than one submission has
 // "Submission to view:" in place of that row, so the link goes under it
 // instead. The address is the student's primary email, from
-// GET /api/v1/courses/:id/users/:user_id?include[]=email, which Canvas fills
-// in only when the grader may read email addresses. It is loaded once per
-// student per page; with no address, no link shows.
+// GET /api/v1/courses/:id/users/:user_id?include[]=email&include[]=
+// inactive_enrollments. Canvas fills in the email only when the grader may
+// read email addresses. Without inactive_enrollments, Canvas does not find a
+// student whose enrollment is inactive (SpeedGrader shows them when the
+// Gradebook shows inactive enrollments), so that student would get no link.
+// The address is loaded once per student per page; with no address, no link
+// shows.
 //
 // Anonymous grading names the student only by an anonymous_id in the URL,
 // so the link shows only when the URL has a student_id.
@@ -103,7 +107,11 @@
     if (!holder) {
       holder = document.createElement("div");
       holder.setAttribute(LINK_MARK, "");
+      // A new tab, so a web mail handler (Gmail, Outlook) does not replace
+      // SpeedGrader and any unsaved comment in it.
       var link = document.createElement("a");
+      link.target = "_blank";
+      link.rel = "noopener";
       link.textContent = "Email this student";
       holder.appendChild(link);
     }
