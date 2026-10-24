@@ -180,6 +180,15 @@ than its newest one, and then its scores differ from the Pangram dashboard.
 Pick a model by name to always send that one. The pick is saved in Chrome's
 synced extension storage.
 
+### 8. Email this student in SpeedGrader
+
+In SpeedGrader, an **Email this student** link appears at the top of the
+grading panel for every student, including a student who has not submitted
+anything. It is a `mailto:` link to the student's primary email address in
+Canvas, so it opens your mail app (or your web mail, in a new tab) with the
+address filled in. The link does not show for anonymous grading, or when
+Canvas does not share the student's email address with you.
+
 ## How it works
 
 - **Favicon** — a content script (`src/favicon/favicon.js`, `document_start`)
@@ -306,6 +315,21 @@ synced extension storage.
   says whether any result is saved; only then does the script read each
   student's submission, when it comes up, to look for its saved result.
 
+- **Email this student** — a content script
+  (`src/speedgrader/email-student.js`, on the same SpeedGrader pages) reads
+  the `student_id` from the URL and asks Canvas for that student once per
+  page (`GET /api/v1/courses/:id/users/:user_id?include[]=email&include[]=inactive_enrollments`).
+  Canvas includes `email` only when you may read email addresses in the
+  course; `inactive_enrollments` lets Canvas find a student whose
+  enrollment is inactive, whom SpeedGrader can also show. The link goes
+  first in the grading panel's flex column (the first child of
+  `[data-testid="speedgrader-grading-panel"]`), as one more item, so the
+  column keeps its height; `src/speedgrader/email-student.css` spaces it
+  from the panel's edge. A `MutationObserver` and the
+  Navigation API's `currententrychange` event keep the link there and in
+  step with the student in the URL. With an `anonymous_id` in the URL and no
+  `student_id`, there is no link.
+
 The Canvas features send only same-origin requests to the Canvas site you are
 on (`canvas.rice.edu` or `hq.globaltech.org`) using your existing session
 (Canvas may redirect a file download to its own file store). The roster
@@ -357,6 +381,8 @@ src/
   speedgrader/pangram.js        SpeedGrader Pangram section + dialog
   speedgrader/pangram.css       section + dialog styling
   speedgrader/submission-text.js  text from text entries, PDF, DOCX, TXT
+  speedgrader/email-student.js  SpeedGrader "Email this student" link
+  speedgrader/email-student.css  link spacing
   background/service-worker.js  holds the API key, calls the Pangram API
   options/                      options page for the Pangram API key and model
 tests/
