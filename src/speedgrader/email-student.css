@@ -1,13 +1,23 @@
 /* Better Canvas (Rice) — "Email this student" link in SpeedGrader.
  *
  * The link sits first in the grading panel's flex column. It keeps its own
- * height when the column is short, and has its own space from the panel's
- * edge. The link itself uses Canvas's link style.
+ * height when the column is short, and lines up with the panel's rows, which
+ * are 24px in from the panel's edge. No Canvas link style reaches it, so it
+ * takes the theme's link color (as the submitted-file links do), with an
+ * underline only on hover and focus.
  */
 
 .bc-email-student {
   flex-shrink: 0;
-  padding: 12px 12px 0;
+  padding: 12px 24px 0;
   font-size: 14px;
   line-height: 1.4;
+}
+.bc-email-student a {
+  color: var(--ic-link-color, #007ac1);
+  text-decoration: none;
+}
+.bc-email-student a:hover,
+.bc-email-student a:focus {
+  text-decoration: underline;
 }
